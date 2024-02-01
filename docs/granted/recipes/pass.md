@@ -22,5 +22,7 @@ Then, run the following commands:
 sudo apt install pass
 gpg --gen-key
 pass init E7BF4FFE628F18FCFC3A6C8DC5E556A9DB95E5E5 # your public key ID from previous step
+
+# Add to ~/.bashrc or ~/.profile
 export GPG_TTY=$(tty)
 ```

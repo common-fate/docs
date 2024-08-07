@@ -118,4 +118,13 @@ The `maximum_number_of_extensions` parameter sets the number of times an Access 
 
 The `extension_duration_seconds` parameter defines the duration, in seconds, that the Access Request will be extended by.
 
-Using the configuration above, if you have 35 minutes remaining on your Access Request, you can extend the duration by 10 minutes. This will increase the remaining time to 45 minutes. You can extend the access up to two times, meaning you can add a total of 20 minutes to your initial access duration.
+Extensions can only be requested after at least 50% of the duration has elapsed. This ensures that extensions are used judiciously and not immediately after access is granted.
+
+For example, with an initial access duration of 60 minutes:
+
+1. You must wait at least 30 minutes (50% of the initial duration) before requesting your first extension.
+2. If you extend when you have 25 minutes remaining, your access will be extended to 35 minutes.
+3. You can request a second extension after another 5 minutes (50% of the extension duration) has elapsed.
+4. With a maximum of two extensions, you can add up to 20 minutes to your initial access duration.
+
+This approach ensures that extensions are used thoughtfully and only when necessary.

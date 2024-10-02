@@ -25,6 +25,17 @@ export default defineConfig({
         Sidebar: "./src/components/Sidebar.astro",
       },
 
+      head: [
+        {
+          tag: "script",
+          attrs: {
+            src: "https://plausible.io/js/script.js",
+            "data-domain": "docs.commonfate.io",
+            defer: true,
+          },
+        },
+      ],
+
       sidebar: [
         {
           label: "Setup",

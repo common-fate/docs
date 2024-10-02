@@ -1,0 +1,57 @@
+---
+title: "S3 Log Destination"
+description: "Send audit log events to an Amazon S3 bucket."
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Common Fate can send audit log events to an Amazon S3 bucket. You can use this to keep an archive of actions taken within Common Fate, or to build your own reports based on access activity within Common Fate.
+
+Logs are written in batches in [JSONL format](https://jsonlines.org/) and can optionally be compressed.
+
+<Aside>
+If you'd like to receive audit log events immediately as they occur, use our [webhook integration](/integrations/webhook) instead.
+</Aside>
+
+## Prerequisites
+
+To configure a webhook integration you'll need to use version 2.18 or later of our [Terraform Provider](https://registry.terraform.io/providers/common-fate/commonfate/latest).
+
+If you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account, you'll need to be on `v1.43.1` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+Additionally, you'll need to deploy an S3 bucket and an AWS IAM role for Common Fate to assume in order to write events to the S3 bucket. The role must meet the following requirements:
+- The role should have a policy allowing the `s3:GetBucketLocation` action on the bucket, and `s3:PutObject` on the bucket contents.
+- The role must have the tag `common-fate-allow-assume-role` with value `true`.
+- The role must have a trust relationship allowing the Common Fate AWS account to assume the role. We recommend setting an External ID condition on the trust relationship to match the `assume_role_external_id` parameter in your Common Fate deployment.
+
+You can use our [`audit-log-bucket` Terraform module](https://registry.terraform.io/modules/common-fate/audit-log-bucket/aws/latest) as a starting point to provision the required S3 bucket and IAM role:
+
+```hcl
+module "audit-log-bucket" {
+  source  = "common-fate/audit-log-bucket/aws"
+  version = "1.0.2"
+  bucket_name = "<the S3 bucket name>"
+  common_fate_aws_account = "<your Common Fate AWS account ID>"
+  assume_role_external_id = "<value which matches the 'assume_role_external_id' in your Common Fate deployment>"
+  writer_role_name        = "common-fate-audit-log-s3-write-role"
+}
+```
+
+## Setting up
+
+You can configure an S3 log destination by adding a Terraform resource similar to the below to your Common Fate application configuration:
+
+```hcl
+resource "commonfate_s3_log_destination" "example" {
+  name        = "Example Log Destination"
+  bucket_name = "example-bucket-name"
+  role_arn    = "arn:aws:iam::123456789012:role/common-fate-audit-log-s3-write-role"
+  key_template       = "{{ .Year }}/{{ .Month }}/{{ .Day }}/{{ .Hour }}_{{ .Minute }}_{{ .Second }}_{{ .ID }}"
+  filter_for_actions = ["grant.requested", "grant.revoked"]
+  compression = "gzip"
+  batch_duration_in_minutes = 5
+  maximum_batch_size = 5000
+}
+```
+
+For details on the available variables in the `commonfate_s3_log_destination` resource, refer to our [Terraform provider documentation](https://registry.terraform.io/providers/common-fate/commonfate/latest/docs/resources/s3_log_destination).

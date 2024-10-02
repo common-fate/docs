@@ -1,0 +1,124 @@
+---
+title: "Managing Backups"
+description: "This guide outlines the steps applying database backups for RDS in Common Fate deployments."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## **Prerequisites**
+
+- A Common Fate deployment
+- Common Fate deployment Terraform version v1.38.0+
+- Access to the deployment account where Common Fate is deployed
+
+## RDS Restore from backup
+
+In Common Fate version v1.38.0 and onwards we have introduced the support for RDS backups from within Terraform. With the introduction of the
+`restore_to_point_in_time` and `rds_db_retention_period` variables to the **Common Fate** deployment module to instruct the build to restore from a previous version of the RDS database.
+
+- By default the `rds_db_retention_period` will be 7 days, meaning you will be able to backup to any point in time in the last 7 days. This is also now configurable and can be increased up to 35 days.
+
+The `restore_to_point_in_time` variable mimics the variable used in the [aws_db_instance](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance#restore-to-point-in-time) AWS Terraform resource.
+
+<Aside>
+  Restoring from a backup or a PITR backup will always result in the creation of
+  a new table. To apply the restored table to your Common Fate deployment you
+  will need to apply the restored table to the table created from the Terraform
+  module
+</Aside>
+
+### Example usage in Common Fate:
+
+```
+resource "common-fate" {
+      ...
+      ...
+      ...
+
+      restore_to_point_in_time = [{
+          restore_time                  = "2024-04-01T16:05:00Z"
+          source_db_instance_identifier = "prod-db"
+          source_dbi_resource_id        = null
+          use_latest_restorable_time    = null
+
+        }]
+}
+```
+
+### Process to restore from backup
+
+To process to restore from a backup in RDS is a 3 part process.
+First you will need to create a new database restore from a backup. Do do this you can pick any time that is within the db retention period and restore a backup from that. This should create a new instance of a RDS database which is restored from a PITR backup.
+This can be done in the AWS Cli or the AWS console.
+
+### AWS CLI
+
+You will first need to find the name of your RDS table. To find it, head into the console and go to RDS then in the list of tables, choose the table created for the Common Fate deployment. It should be named like this: `<namespace>-<stage>-pg-db`
+
+Run the following command
+
+```
+aws rds restore-db-instance-to-point-in-time \
+    --source-db-instance-identifier <namespace>-<stage>-pg-db \
+    --target-db-instance-identifier temp-commonfate-restore \
+    --restore-time 2017-10-14T23:45:00.000Z \
+    --allocated-storage 100 \
+    --max-allocated-storage 1000
+```
+
+### AWS Console
+
+1. Sign in to the AWS Management Console and open the Amazon RDS console at https://console.aws.amazon.com/rds/.
+
+2. In the navigation pane, choose Automated backups.
+
+3. The automated backups are displayed on the Current Region tab.
+
+4. Choose the DB instance that you want to restore.
+
+5. For Actions, choose Restore to point in time.
+
+6. The Restore to point in time window appears.
+
+7. Choose Latest restorable time to restore to the latest possible time, or choose Custom to choose a time.
+
+8. If you chose Custom, enter the date and time to which you want to restore the instance.
+
+<Aside>
+  Times are shown in your local time zone, which is indicated by an offset from
+  Coordinated Universal Time (UTC). For example, UTC-5 is Eastern Standard
+  Time/Central Daylight Time.
+</Aside>
+
+9. For DB instance identifier, enter the name of the target restored DB instance. The name must be unique. For example 'temp-commonfate-restore'
+
+10. Choose other options as needed, such as DB instance class, storage, and whether you want to use storage autoscaling.
+
+11. Choose Restore to point in time.
+
+### Updating Common Fate deployment
+
+Once you have made the restore and it has successfully created. You can now update the Common Fate deployment with the RDS identifier of the DB you just created.
+To do this add the following to your Common Fate deployment Terraform:
+
+```
+restore_to_point_in_time = {
+     restore_time                             = "2024-04-03T16:40:31+11:00"
+     source_db_instance_identifier            = "temp-commonfate-restore" //the name of the restored db you made above
+     source_dbi_resource_id                   = null
+     use_latest_restorable_time               = null
+     source_db_instance_automated_backups_arn = null
+}
+```
+
+Then run `terraform apply`
+
+<Aside>
+  `source_db_instance_indentifier` or `source_dbi_resource_id` is required and
+  either `restore_time` or `use_latest_restorable_time` must be used in
+  conjunction to identify which PITR backup should be used.
+</Aside>
+- This will cause a replacement of the database. This is why we made a replica during
+step one.{" "}
+
+When completed confirm that the deployment is working and you can delete the replica created in step one.

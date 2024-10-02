@@ -1,0 +1,67 @@
+---
+title: "AWS RDS"
+description: "Using the Granted AWS RDS Plugin."
+---
+
+The Granted AWS RDS Plugin allows you to broker a connection to an AWS RDS database over [AWS SSM Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html). The connection is routed through a [Common Fate AWS Proxy](https://registry.terraform.io/modules/common-fate/common-fate-proxy-ecs/aws/latest) which runs on AWS Fargate and captures audit logs of the SQL statements executed.
+
+Using AWS SSM Session Manager allows you to access databases within your VPC without needing to manage a VPN or expose your databases to public ingress.
+
+![Audit Logs Screenshot](./images/rds/audit-logs-screenshot.png)
+
+The plugin uses the Common Fate control plane APIs to determine which databases a user is authorized to access, so to use this plugin a Common Fate instance is required. Email us at hello@commonfate.io if you'd like to test this and we'll set up an instance for you.
+
+## Requirements
+
+To use this plugin, you'll need a [Common Fate instance](/introduction) with the [AWS RDS integration configured](/integrations/awsrds).
+
+You'll also need to be running Granted v0.31 or later. You can check your Granted version by running `granted -v`.
+
+To use the plugin, run:
+
+```
+granted rds proxy
+```
+
+You should see a selector showing the databases that you are permitted to request access to:
+
+```
+❯ granted rds proxy
+┃ Select a database to connect to
+┃   Database                                Role
+┃ > Prod Postgres Database                  Root
+┃
+```
+
+Select a database with the up and down arrows, and press Enter. You should see an output like the below:
+
+```
+❯ granted rds proxy
+[WILL REQUEST] Root access to Prod Postgres Database will require approval
+? Apply proposed access changes Yes
+[i] Attempting to grant access...
+? Reason for access (Required) Confirming data migration for INC-31 has completed
+[REQUESTED] Root access to Prod Postgres Database requires approval: https://commonfate.example.com/access/requests/req_2jhUJNN57wvfW39Vwgace6xHK3W
+[✘] applying access was attempted but the resources requested require approval before activation
+```
+
+Depending on the authorization policies your Common Fate administrators have configured, access may be automatically approved to the database, or may require a manual approval.
+
+Once access is approved, you can re-run `granted rds proxy` to begin brokering a connection. You should see an output similar to the below:
+
+```
+granted rds proxy
+[ACTIVE] Root access to Prod Postgres Database is already active for the next 1h: https://commonfate.example.com/access/requests/req_2jhUJNN57wvfW39Vwgace6xHK3W
+[i] Grant is activated
+
+[i] Database proxy ready for connections on 127.0.0.1:5432
+
+[i] You can connect now using this connection string: postgresql://postgres:password@127.0.0.1:5432/postgres?sslmode=disable
+
+[i] Or using the postgres cli: psql "postgresql://postgres:password@127.0.0.1:5432/postgres?sslmode=disable"
+
+[i] Connection accepted for session [1]
+[i] Connection ended for session [1]
+```
+
+Under the hood, Granted opens an AWS SSM Session Manager session to the [Common Fate AWS Proxy service](https://registry.terraform.io/modules/common-fate/common-fate-proxy-ecs/aws/latest). The AWS Proxy service intercepts and logs the SQL statements you are running, and forwards the commands to the database.

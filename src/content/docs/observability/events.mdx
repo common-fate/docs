@@ -1,0 +1,24 @@
+---
+title: "Events"
+description: "Learn how to send events from Common Fate to an external SIEM."
+---
+
+## Sending events to your SIEM
+
+A [SIEM](https://en.wikipedia.org/wiki/Security_information_and_event_management) is a tool which aggregates and analyses security events. You can add a destination to the Common Fate event bus to send audit trail events to your SIEM.
+
+Depending on the capabilities of your SIEM, we recommend following one of three approaches below.
+
+### If your SIEM supports [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/) log streams
+
+By default, Common Fate logs all events to an Amazon CloudWatch log group.
+
+If your SIEM can read Amazon CloudWatch log streams, you can connect it directly to the event log group. The name of this log group can be found by looking at the event_bus_log_group_name output from the Common Fate terraform module.
+
+### If your SIEM supports REST API events
+
+If your SIEM supports event delivery using a REST API, [follow this tutorial](https://aws.amazon.com/blogs/compute/using-api-destinations-with-amazon-eventbridge/) to receive events.
+
+### Custom integrations
+
+If you need to build custom integration logic to send events to your SIEM, you can add an AWS Lambda destination to the event bus by [following this guide](https://aws.amazon.com/blogs/compute/integrating-amazon-eventbridge-into-your-serverless-applications/).

@@ -1,0 +1,176 @@
+---
+title: "Microsoft Entra"
+description: "A guide to setting up Single-Sign-On to Common Fate using Microsoft Entra."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+### SAML configuration
+
+To configure Microsoft Entra (formerly Azure AD) as the identity provider, follow these steps to create an Enterprise Application in your Azure console.
+
+To add an enterprise application to your tenant:
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com/) as at least a [Cloud Application Administrator](https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#cloud-application-administrator).
+2. Browse to Identity > Applications > Enterprise applications > All applications.
+3. Select New application.
+4. Select **Create your own application**.
+5. Enter a name e.g 'Common Fate'
+6. Select **Integrate any other application you don't find in the gallery (Non-gallery)**
+7. Click **Create**
+
+You will now be on the application overview page.
+
+1. Select **Single sign-on**
+2. Select **SAML**
+3. In **Basic SAML Configuration** set **Identifier (Entity ID)** to the `first_time_setup_config.saml_sso_entity_id` from the deployment outputs
+4. In **Basic SAML Configuration** set **Reply URL (Assertion Consumer Service URL)** to the `first_time_setup_config.saml_sso_acs_url` from the deployment outputs
+5. In **Attributes & Claims** set **emailaddress** to `user.mail`
+6. Finally, copy the **App Federation Metadata Url** and save the configuration
+7. Add the following variables to your Terraform deployment
+
+   ```toml
+   saml_provider_name    = "Entra"
+   saml_metadata_is_file = false
+   saml_metadata_source  = <App Federation Metadata Url**>**
+   ```
+
+8. Run a deployment
+
+   ```bash
+   terraform apply
+   ```
+
+### SCIM user and group provisioning
+
+1. To configure SCIM you will need to create a secret token for API authentication, use a strong token generator to generate a secret, then save it to SSM Parameter Store.
+
+   You can use the AWS CLI to create a secret in the region you are deploying to, you must use the following path `"/<namespace>/<stage>/<secret name>"`
+
+   ```bash
+   aws ssm put-parameter \
+       --name "/common-fate/prod/scim-secret" \
+       --value "mySecretValue" \
+       --type "SecureString" \
+       --region "ap-southeast-2"
+   ```
+
+   Retrieve the ARN
+
+   ```bash
+   aws ssm get-parameter \
+       --name "/common-fate/prod/scim-secret" --query Parameter.ARN
+   ```
+
+2. Add the following into your `main.tf` file
+
+   ```toml
+   scim_token_ps_arn     = <scim secret parameter store ARN>
+   scim_source           = "Entra"
+   ```
+
+3. Run a deployment
+
+   ```bash
+   terraform apply
+   ```
+
+4. Sign in to the [Microsoft Entra Admin Center](https://entra.microsoft.com/) as at least a [Cloud Application Administrator](https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#cloud-application-administrator).
+5. Browse to **Identity** > **Applications** > **Enterprise applications** > Search for your application e.g Common Fate
+6. Select **Users and groups**
+7. Assign Groups to the application, You should assign all the Groups for which you would like to create Access Policies for with Common Fate
+8. You can optionally assign individual users to the application as well
+9. Select **Provisioning**
+10. Select **Manage > Provisioning**
+11. Set **Provisioning Mode** to Automatic
+12. Under **Admin Credentials** set **tenant URL** to `https://<your app URL>/api/v1/scim/Entra`
+13. Under **Admin Credentials** set **Secret Token** to your secret generated previously
+14. Under **Mappings** go to the **Provision Microsoft Entra ID Users** settings and replace the **mailNickname** to **externalId** mapping: it must be **objectId** to **externalId**.
+    <img height="200" src="/images/entra/scim-mapping.png" />
+15. Click **Test Connection** you should get a success message
+16. Navigate back to **Provisioning > Overview**
+17. Select **Start Provisioning**
+18. Optionally: Provision yourself on demand the login to the Common Fate web application.
+
+At this point the Application is fully deployed and ready to be configured, users and groups will start to sync automatically, you can provision on demand at any time if need be.
+
+## Resetting
+
+If you've misconfigured the Entra SCIM integration, you can reset the integration using Common Fate. This is useful in case you've missed step (14) above to set the `objectId` mapping up.
+
+<Aside>
+To trigger the Entra SCIM reset, you'll need to have the `cf` CLI `v1.8.0` or greater installed. You can check the version by running `cf --version` and [follow our guide here to install or update the CLI](/user-guide/cli/quickstart).
+
+If you're using a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate running in your own AWS environment, you'll need to be on you'll need to be on `v1.23.1` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+</Aside>
+
+In order to reset the Entra SCIM integration, you'll first need to give yourself permission to trigger the reset.
+
+First, obtain your Common Fate user ID by running:
+
+```bash
+cf identity get
+```
+
+You should see an output similar to the below:
+
+```
+> cf identity get
+Chris Norman <chris@commonfate.io> (CF::User::"usr_2ZFBBf4gOevAXQi9aAfK2tYUeFa")
+```
+
+Your user ID is shown in brackets at the end of the CLI output. It should look something like `usr_2ZFBBf4gOevAXQi9aAfK2tYUeFa`.
+
+Then, [add a Cedar policy](/authz/introduction#deploying-authorization-policies-to-terraform) which grants access to the `CF::Control::Integration::Reset::ResetService::Action::"ResetEntraUsers"` action:
+
+```js
+permit(
+  principal == CF::User::"<YOUR_USER_ID_HERE>", // replace with your user ID, e.g. CF::User::"usr_2ZFBBf4gOevAXQi9aAfK2tYUeFa"
+  action ==
+    CF::Control::Integration::Reset::ResetService::Action::"ResetEntraUsers",
+  resource
+);
+```
+
+Next, disable SCIM user provisioning in Entra ID for the Common Fate application.
+
+Then, verify in Microsoft Entra that `objectId` is mapped to `externalId`:
+
+![SCIM Mapping](/images/entra/scim-mapping.png)
+
+Now, run a dry-run of the reset:
+
+```
+cf integration reset entra --dry-run=true
+```
+
+Common Fate will show you a preview of the entities which will be removed.
+
+After you've confirmed the entities, proceed by running the reset:
+
+```
+cf integration reset entra --dry-run=false
+```
+
+Now, enable SCIM user provisioning again in Common Fate. You'll need to wait up to 5 minutes for the initial SCIM sync to complete.
+
+You may need to click the **Restart** button. Ensure that the your administrative page looks like the screenshot below to force a full sync.
+
+![SCIM Process Restart](/images/cf-entra-restart-scim.png)
+
+After the SCIM process is complete, visit the **Resources** page inside of Common Fate and verify that `Entra::User` resources are present in your deployment. Your Entra user resources should have an ID which looks similar to the screenshot below.
+
+![Entra Users](/images/cf-entra-users.png)
+
+Finally, revoke your permissions to reset SCIM by removing the Cedar policy you applied earlier for the `CF::Control::Integration::Reset::ResetService::Action::"ResetEntraUsers"` action.
+
+```diff
+// remove this policy from your Cedar policy sets.
+-permit(
+-  principal == CF::User::"<YOUR_USER_ID_HERE>", // replace with your user ID, e.g. CF::User::"usr_2ZFBBf4gOevAXQi9aAfK2tYUeFa"
+-  action ==
+-    CF::Control::Integration::Reset::ResetService::Action::"ResetEntraUsers",
+-  resource
+-);
+```

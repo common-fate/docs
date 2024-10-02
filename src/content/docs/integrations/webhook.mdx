@@ -1,0 +1,186 @@
+---
+title: "Webhooks"
+description: "Send webhooks based on events in Common Fate"
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Common Fate can send webhook events based on audit log and authorization events to a HTTP destination. You can use webhook events to build your own alerts or integrations with Common Fate, or to push events to a monitoring platform.
+
+## Prerequisites
+
+To configure a webhook integration you'll need to use version 2.14 or later of our [Terraform Provider](https://registry.terraform.io/providers/common-fate/commonfate/latest).
+
+If you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account, you'll need to be on `v1.36.0` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+## Setting up
+
+You can configure a webhook by adding a Terraform resource similar to the below:
+
+```hcl
+resource "commonfate_webhook_integration" "my_webhook_destination" {
+  name                      = "My Webhook Destination"
+  url                       = "https://webhook.example.com/webhook/path"
+  send_audit_log_events     = true
+  send_authorization_events = true
+  headers = [
+    {
+      key   = "My-Custom-Header",
+      value = "abcdef123"
+    },
+      {
+      key   = "X-my_other_header",
+      value = "def456"
+    }
+  ]
+}
+```
+
+Common Fate can send Audit Log events and/or Authorization events to a webhook.
+
+| Event Type    | Description                                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Audit Log     | Emitted when a Grant to an entitlement is updated                                                                       |
+| Authorization | Emitted when an authorization decision is made. Authorization events are emitted each time a Common Fate API is called. |
+
+You can set HTTP headers by specifying them in the `headers` variable.
+
+Common Fate will make a `POST` request to the specified HTTP endpoint each time a matching event occurs.
+
+## Audit Log actions
+
+Audit log events contain an `action` field indicating the particular action which occurred in Common Fate:
+
+| Action                         | Emitted when                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `grant.requested`              | A Grant was requested.                                                                                        |
+| `grant.approved`               | Access was approved.                                                                                          |
+| `grant.activated`              | Access was activated.                                                                                         |
+| `grant.provisioned`            | Access was provisioned into the integration. For example, an AWS account assignment was successfully created. |
+| `grant.provisioning_attempted` | Access provisioning was attempted.                                                                            |
+| `grant.extended`               | Access was extended.                                                                                          |
+| `grant.deprovisioned`          | Access was deprovisioned in the integration.                                                                  |
+| `grant.cancelled`              | Pending access was cancelled                                                                                  |
+| `grant.revoked`                | Active access was revoked                                                                                     |
+| `grant.provisioning_error`     | Common Fate encountered an error when provisioning access.                                                    |
+| `grant.deprovisioning_error`   | Common Fate encountered an error when deprovisioning access.                                                  |
+| `grant.breakglass_activated`   | Access was activated using breakglass access.                                                                 |
+
+## Example events
+
+Examples of Audit Log and Authorization events are shown below.
+
+### Authorization event
+
+```json
+{
+  "id": "eval_2f09RoYiTw7DWQVajH8kCAzOMPW",
+  "request": {
+    "principal": { "type": "CF::Service", "id": "Terraform" },
+    "action": {
+      "type": "CF::RPC::Action",
+      "id": "commonfate.control.integration.v1alpha1.IntegrationService/GetIntegration"
+    },
+    "resource": { "type": "CF::Service", "id": "ControlPlane" },
+    "client_key": "",
+    "overlay_entities": [],
+    "overlay_children": [],
+    "tags": [{ "key": "read_only", "value": "true" }]
+  },
+  "decision": 2,
+  "diagnostics": {
+    "reason": ["default_api_authorization_policy.policy0"],
+    "errors": [],
+    "annotations": []
+  },
+  "client_key": "",
+  "evaluated_at": "2024-04-12T13:05:22.182451Z",
+  "evaluation_duration": "0.228485708s",
+  "allowed": true
+}
+```
+
+### Audit log event
+
+```json
+{
+  "id": "evt_2f0ChzJvrOOqchMhRmJieErz9Bl",
+  "targets": [
+    { "type": "AWS::Account", "id": "450666865322" },
+    {
+      "type": "AWS::IDC::PermissionSet",
+      "id": "arn:aws:sso:::permissionSet/ssoins-825968feece9a0b6/ps-04543749a2b53328"
+    },
+    {
+      "type": "Access::Grant",
+      "id": "gra_2f0ChywPOnsskEl3bEaF5RXhA8Z"
+    },
+    {
+      "type": "Access::Request",
+      "id": "req_2f0Cia6Sq4WeSIYJo4QiQr82kgg"
+    }
+  ],
+  "action": "grant.requested",
+  "caller_identity_chain": [
+    {
+      "id": {
+        "type": "OIDC::Token",
+        "id": "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_xiRwP4g66/1582842e-e112-4fda-963f-33ea54f88b5e"
+      }
+    },
+    {
+      "id": {
+        "type": "OIDC::Subject",
+        "id": "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_xiRwP4g66/33eca176-8e39-4997-98e3-304a32224a35"
+      }
+    },
+    {
+      "id": {
+        "type": "CF::User",
+        "id": "usr_2ZaVKh5QwjlPsy1ImKc6GY2Xbsc"
+      }
+    }
+  ],
+  "actor": {
+    "type": "CF::User",
+    "id": "usr_2ZaVKh5QwjlPsy1ImKc6GY2Xbsc",
+    "name": "Chris Norman",
+    "email": "chris@commonfate.io"
+  },
+  "message": "S3ListBuckets access was requested",
+  "context": {
+    "request": {
+      "client_addr": "127.0.0.1",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+    },
+    "authz": { "eval": "eval_2f0CiEDjaVlVw9BjJP4Wn4dQMDb" }
+  },
+  "occurred_at": "2024-04-12T14:32:11.981852+01:00",
+  "index": 0
+}
+```
+
+The `index` field is currently used internally for sorting audit logs emitted concurrently.
+
+The `caller_identity_chain` includes the specific OIDC token and subject used by the caller to authenticate to Common Fate.
+
+The `targets` field includes resources which are affected by the action.
+
+The `context.request.client_addr` field contains the IP address of the actor that performed the action.
+
+The `context.authz.eval` field contains the authorization evaluation associated with a particular action. You can [inspect the authorization event](/observability/authorization) in Common Fate.
+
+## Filtering for actions
+
+You can configure a webhook to filter for specific actions by updating your Terraform config.
+For example, to send only the events for `grant.approved` use the following configuration:
+
+```diff
+resource "commonfate_webhook_integration" "my_webhook_destination" {
+  name                      = "My Webhook Destination"
+  url                       = "https://webhook.example.com/webhook/path"
+  send_audit_log_events     = true
+  send_authorization_events = true
++ filter_for_actions = ["grant.approved"]
+}
+```

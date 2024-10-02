@@ -1,0 +1,44 @@
+---
+title: "Okta"
+description: "A guide to setting up Single-Sign-On to Common Fate using Okta."
+---
+import { Aside } from '@astrojs/starlight/components';
+
+### Create the SAML Application
+
+To get started navigate to the **Applications** tab of the Okta console.
+
+Click **Create App Integration**, then select the **SAML 2.0** option. Click **Next** then Give your application a suitable name then click **Next**.
+
+### Configure the SAML Application
+
+Set the **Single sign-on URL** field to be `first_time_setup_config.saml_sso_acs_url` from the deployment outputs.
+
+Set the **Audience URI (SP Entity ID)** field to be `first_time_setup_config.saml_sso_entity_id` from the deployment outputs.
+
+In Attributes Statements set **Name** to `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress` and **Value** to `user.email`.
+
+Click **Next** then **Finish**
+
+<Aside>
+  You'll need to assign yourself and other users to the SAML application before
+  you can login.
+</Aside>
+
+### Setup the SAML SSO provider in your deployment
+
+Copy the **Metadata URL** from the **Sign On** tab of your newly created application.
+
+Add the following variables to your Terraform deployment
+
+```toml
+saml_provider_name    = "Okta"
+saml_metadata_is_file = false
+saml_metadata_source  = <The SAML metadata URL>
+```
+
+Now, run a deployment:
+
+```bash
+terraform apply
+```

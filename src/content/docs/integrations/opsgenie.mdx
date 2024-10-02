@@ -1,0 +1,49 @@
+---
+title: "OpsGenie"
+description: "OpsGenie"
+---
+
+## OpsGenie and Common Fate
+
+Common Fate integrates with OpsGenie to contextually approve access based on a user's on-call status.
+
+## Prerequisites
+
+To set up OpsGenie in your Common Fate deployment you will need to create an API key within your OpsGenie tenancy.
+
+1. Log into your OpsGenie account with an admin user. In the left nav you will see an App Settings section. Select "API key management".
+
+2. You will be taken to the API key management page, next click on the "Add new API key" button in the top right.
+
+3. Here you will fill in some information about the API key. The name can be called **Common Fate** and you should select **Read** and **Configuration access** in the Access rights section.
+
+4. Copy the Access Key value.
+
+You can use the AWS CLI to create a secret in the region you are deploying to, you must use the following path `"/<namespace>/<stage>/<secret name>"`
+
+```bash
+aws ssm put-parameter \
+    --name "/common-fate/prod/opsgenie-api-key" \
+    --value "mySecretValue" \
+    --type "SecureString"
+```
+
+5. In your configuration Terraform, add the following into your `main.tf` file
+
+```hcl
+resource "commonfate_opsgenie_integration" "opsgenie" {
+  name                = "Ops Genie"
+  api_key_secret_path = "/common-fate/prod/opsgenie-api-key"
+}
+
+```
+
+6. Run a deployment
+
+```hcl
+terraform apply
+```
+
+## Support
+
+If you need assistance with this integration, please contact [support@commonfate.io](mailto:support@commonfate.io), or join our Slack community [here](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg), we're happy to help!

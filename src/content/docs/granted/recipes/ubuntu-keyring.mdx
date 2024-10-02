@@ -1,0 +1,29 @@
+---
+title: "Encrypting AWS SSO Tokens Using Gnome Keyring"
+banner:
+  content: |
+    Get audited access to RDS databases without a VPN using the Granted RDS Plugin.
+    <a href="/granted-rds">Learn more here</a>.
+---
+
+Granted uses an [open-source library](https://github.com/99designs/keyring) to securely store AWS SSO tokens in a backend service. Apart from `pass` or the `Windows Credentials Manager`, Linux Desktop users that leverage Gnome as their desktop environment can use keyring to securely store AWS SSO tokens, and get it unlocked with the default `login` keychain.
+
+## Prerequisites
+
+- Installed Granted CLI tool.
+- Access to AWS SSO tokens.
+- Gnome keyring installed. Tested on Ubuntu 22 with Gnome 40+
+
+## Configuration
+
+Open the Granted configuration file located at `~/.granted/config`. Add the following configuration to specify the backend for keyring:
+
+```
+[Keyring]
+  Backend = "secret-service"
+  LibSecretCollectionName = "login"
+```
+
+Next time you run Granted, it will use the `secret-service` backend to store AWS SSO tokens and it will not ask you to enter your password. It will unlock it with the `login` keychain instead.
+
+To learn more about how to configure the keyring, check out [these settings](https://github.com/common-fate/granted/blob/bcf79899f282cceff6313f1757d963e4dbbf44e1/pkg/config/config.go#L58-L63) that are exposed in Granted and the upstream [library documentation](https://pkg.go.dev/github.com/99designs/keyring?utm_source=godoc) for further details.

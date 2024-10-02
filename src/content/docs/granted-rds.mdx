@@ -1,0 +1,44 @@
+---
+title: "Granted for RDS access"
+description: "Use Granted with Common Fate for audited RDS access without a VPN."
+template: splash
+hero:
+  title: 'Granted for AWS RDS'
+  tagline: Granted integrates with Common Fate for audited RDS access without a VPN.
+  actions:
+    - text: Get Started
+      link: https://manage.commonfate.io
+      icon: right-arrow
+    - text: Talk to Sales
+      link: https://www.commonfate.io/contact-sales
+      icon: external
+      variant: minimal
+    - text: See Pricing
+      link: https://www.commonfate.io/pricing
+      icon: external
+      variant: minimal
+sidebar:
+  hidden: true
+---
+
+import { LinkButton } from '@astrojs/starlight/components';
+
+The Granted AWS RDS Plugin integrates with the [Common Fate](https://commonfate.io) access platform, allowing you to broker a connection to an AWS RDS database over [AWS SSM Session Manager](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html). The connection is routed through a [Common Fate AWS Proxy](https://registry.terraform.io/modules/common-fate/common-fate-proxy-ecs/aws/latest) which runs on AWS Fargate and captures audit logs of the SQL statements executed.
+
+Connecting to a database is as simple as running:
+
+```bash
+granted rds proxy
+```
+
+Audit logs of SQL commands executed are logged and can be streamed to an AWS S3 bucket.
+
+![Audit Logs Screenshot](./granted/plugins/images/rds/audit-logs-screenshot.png)
+
+<LinkButton href="https://manage.commonfate.io" icon="right-arrow">Get started</LinkButton>
+<LinkButton href="https://www.commonfate.io/contact-sales" variant="minimal" icon="external">
+  Talk to Sales
+</LinkButton>
+<LinkButton href="https://commonfate.io/pricing" variant="minimal" icon="external">
+  See Pricing
+</LinkButton>

@@ -1,0 +1,92 @@
+---
+title: "Alerts"
+description: "Set up alerting for your Common Fate deployment."
+---
+
+A Common Fate deployment provisions AWS SNS topics used to alert on deployment issues. Common Fate currently emits alerts if an ECS deployment fails, or if a background task fails (e.g. syncing AWS accounts or cleaning up expired access).
+
+## Connecting alerts to PagerDuty
+
+You can use a `aws_sns_topic_subscription` resource to subscribe to alerts, similar to the below:
+
+```hcl
+resource "aws_sns_topic_subscription" "alerts_to_pagerduty" {
+  for_each  = module.common-fate-deployment.alert_topics
+  topic_arn = each.value.sns_topic_arn
+  protocol  = "https"
+
+  endpoint  = "<Your PagerDuty webhook URL>"
+  endpoint_auto_confirms = true
+}
+```
+
+## Connecting alerts to Datadog
+
+You can use a `aws_sns_topic_subscription` resource to subscribe to alerts, similar to the below:
+
+```hcl
+resource "aws_sns_topic_subscription" "alerts_to_datadog" {
+  for_each  = module.common-fate-deployment.alert_topics
+  topic_arn = each.value.sns_topic_arn
+  protocol  = "https"
+
+  # replace <API_KEY> with your Datadog API key, see: https://docs.datadoghq.com/integrations/amazon_sns/
+  endpoint  = "https://app.datadoghq.com/intake/webhook/sns?api_key=<API_KEY>"
+}
+```
+
+## Connecting alerts to other providers
+
+If your monitoring provider supports incoming webhooks you can use a `aws_sns_topic_subscription` resource to subscribe to alerts, similar to the below:
+
+```hcl
+resource "aws_sns_topic_subscription" "alerts_to_other" {
+  for_each  = module.common-fate-deployment.alert_topics
+  topic_arn = each.value.sns_topic_arn
+  protocol  = "https"
+
+  endpoint  = "<Your provider's webhook URL>"
+}
+```
+
+## Runbooks
+
+### For deployment failures
+
+The alert will fire if you trigger a new Terraform deployment with `terraform apply`, but the ECS task doesn’t roll out properly (internally the event comes from ECS Deployment Circuit Breaker). The stack is configured to use blue/green deployments, so the previous version of the task will still be running. So in this instance, the alert firing doesn’t necessarily mean the product is unavailable.
+
+The runbook here is:
+
+1. Check the deployment events in the ECS cluster for details as to why the task failed.
+
+2. Revert or fix the configuration which caused the task to fail and rerun `terraform apply`
+
+### For syncing task failures
+
+If the alert is firing, the impact is that Common Fate will not sync any updates and resource data inside of Common Fate may be stale. For example, if you add a tag to an AWS account, but the `aws_idc_sync` task is failing, the new tag will not sync to Common Fate. Access Requests will continue to work, but the resource data will be stale.
+
+The runbook here is:
+
+1. Confirm whether there were any recent changes to the integration configuration in Terraform which corresponded to the alert firing (for example, was the read_role_arn updated to an invalid role).
+
+1. Confirm whether the credentials used by Common Fate in the application are still valid. The error message in the alert will indicate whether the issue is due to invalid credentials.
+
+1. For example, in AWS, confirm that the role deployed by the `common-fate/common-fate-deployment/aws//modules/aws-idc-integration/iam-roles` actually exists. For the AWS integration, re-run terraform apply on the IAM role module to check whether there has been any drift. For other applications like OpsGenie, confirm that the API key used by Common Fate exists.
+
+1. Update the configuration to fix the permission error (for example, by recreating the OpsGenie API key) and re-run `terraform apply`.
+
+### For cleanup task failures
+
+If the alert is firing, the impact is that Common Fate is failing to clean up expired access and deprovision access. End users will still be able to request access, but access may be granted for longer than intended.
+
+The runbook here is:
+
+1. Confirm whether there were any recent changes to the integration configuration in Terraform which corresponded to the alert firing (for example, was the `provision_role_arn` updated to an invalid role).
+
+1. Confirm whether the credentials used by Common Fate in the application are still valid. The error message in the alert will indicate whether the issue is due to invalid credentials.
+
+1. Check the logs of the provisioner service which will include detailed information around the failure.
+
+1. Update the configuration to fix the permission error (for example, by changing the `provision_role_arn` to the correct value) and re-run `terraform apply`.
+
+1. When the cleanup task recovers, expired access will be cleaned up automatically.

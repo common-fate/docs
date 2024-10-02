@@ -1,0 +1,51 @@
+---
+title: "Managed Monitoring"
+description: "Learn how to enable managed monitoring for your Common Fate deployment."
+---
+
+For Bring-Your-Own-Cloud (BYOC) customers, Managed Monitoring allows Common Fate to proactively monitor the health of your deployment.
+
+When Managed Monitoring is enabled, OpenTelemetry tracing data is sent to our central collector. This is the same tracing data which is currently emitted to AWS X-Ray in your Common Fate deployment account — you can look at the X-Ray service to see exactly what is sent.
+
+The types of data includes:
+
+- the kinds of background tasks running in your deployment and the duration these tasks are running for
+- durations and success/error statuses of calls made to Common Fate APIs
+- internal operations, such as queries made to a database (excluding any database query parameters, which may be sensitive)
+- internal Common Fate resource identifiers, such as Access Request IDs and Common Fate user IDs
+- the current version of Common Fate that is deployed to your environment
+
+Our collector infrastructure is hosted at otel.commonfate.io, with static IPs: `75.2.123.103` and `76.223.45.177`.
+
+## Prerequisites
+
+If you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account, you'll need to be on `v1.40.0` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+## Enabling Managed Monitoring
+
+Enable Managed Monitoring by setting the `managed_monitoring_enabled` to `true` in your Terraform deployment:
+
+```hcl
+module "common-fate-deployment" {
+	...
+	managed_monitoring_enabled = true
+}
+```
+
+## FAQ
+
+### Is any sensitive data included?
+
+Sensitive data such as cloud resource identifiers or email addresses are _not _ included in OpenTelemetry traces. You can confirm this by looking at AWS X-Ray.
+
+### Where is monitoring data stored?
+
+Common Fate stores OpenTelemetry data in [Axiom](axiom.co) with a 90 day retention. Axiom is SOC2 and ISO27001 certified.
+
+### How is the data protected?
+
+The OpenTelemetry Collector endpoint is write-only, and is authenticated. Common Fate deployments exchange their licence key for a Monitoring Write Token. The Write Token allows OpenTelemetry events to be sent to the Collector endpoint.
+
+### Can I disable Managed Monitoring?
+
+Yes -- Managed Monitoring is opt-in.

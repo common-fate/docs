@@ -1,0 +1,272 @@
+---
+title: "Slack"
+description: "Slack"
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Connecting to Slack
+
+Common Fate integrates with Slack to send notifications to Slack channels when access is requested and approved.
+
+Common Fate integrates with your Slack workspace using a private application which you create and manage.
+
+When Slack is connected, users will receive notifications when an incoming request needs approval.
+
+When an approver clicks on the "Approve" or "Close Request" buttons, they will be redirected to the web application to confirm their decision. Users who make requests will also receive notifications when the status of their request changes.
+
+<Aside>
+  Common Fate allows you to configure Slack integrations to multiple Slack workspaces.
+</Aside>
+
+## Integration Walkthrough
+
+To configure your deployment to use Slack notifications, you first need to create a private Slack app. You can use the app manifest file below to setup the app as required.
+
+1. Replace both instances of `<your app URL>` with your app URL in the JSON below:
+
+```json
+{
+  "display_information": {
+    "name": "Common Fate",
+    "description": "Common Fate powers your cloud access workflows",
+    "background_color": "#26223a"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Common Fate",
+      "always_online": false
+    },
+    "slash_commands": [
+      {
+        "command": "/access",
+        "url": "<Your app url>/api/v1/integrations/slack/access-command",
+        "description": "Common Fate Access Workflow",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "redirect_urls": ["<Your app url>/api/v1/oauth2/callback/slack"],
+    "scopes": {
+      "bot": [
+        "channels:read",
+        "users:read",
+        "users:read.email",
+        "chat:write",
+        "chat:write.public",
+        "groups:read",
+        "groups:write",
+        "im:read",
+        "im:write",
+        "mpim:read",
+        "mpim:write",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "<Your app url>/api/v1/integrations/slack/interactivity",
+      "message_menu_options_url": "<Your app url>/api/v1/integrations/slack/options-load"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
+```
+
+1. Navigate to https://api.slack.com/apps
+2. Select **Create New App**
+3. Select **From an app manifest**
+4. Select your workspace from the drop down
+5. Paste the completed app manifest JSON
+6. Select **Next**
+7. Select **Create**
+8. You will now need to save the client secret and client signing secret to SSM Parameter Store.
+
+   You can use the AWS CLI to create a secret in the region you are deploying to, you must use the following path `"/<namespace>/<stage>/<secret name>"`
+
+   ```bash
+   aws ssm put-parameter \
+       --name "/common-fate/prod/slack-client-secret" \
+       --value "mySecretValue" \
+       --type "SecureString"
+
+   aws ssm put-parameter \
+       --name "/common-fate/prod/slack-signing-secret" \
+       --value "mySecretValue" \
+       --type "SecureString"
+   ```
+
+   Retrieve the ARN
+
+   ```bash
+   aws ssm get-parameter \
+       --name "/common-fate/prod/slack-client-secret" --query Parameter.ARN
+
+   aws ssm get-parameter \
+       --name "/common-fate/prod/slack-signing-secret" --query Parameter.ARN
+   ```
+
+## Create the resource in Common Fate Terraform Config
+
+Add the following resource into your config using the `commonfate` Terraform provider.
+
+```hcl
+resource "commonfate_slack_integration" "slack" {
+  name                       = "Slack"
+  client_id                  = <slack client id>
+  client_secret_secret_path  = "/common-fate/prod/slack-client-secret"
+  signing_secret_secret_path = "/common-fate/prod/slack-signing-secret"
+}
+```
+
+Apply the new resource with `terraform apply`
+
+## In Common Fate
+
+<Aside>
+  You will need to be an administrator of the Slack workspace to complete this
+  process.
+</Aside>
+
+1. Sign in to your **Common Fate** deployment and from the home screen, navigate to **Settings**.
+
+2. On the Access Controls page, scroll down to the **Integrations section**. Locate the **Slack** connection and click on **Connect**. This initiates the OAuth flow to integrate Slack with your Common Fate account.
+
+3. Enter your login details to sign in with Slack if needed, and you will be asked which Slack tenant you want to install into.
+4. After logging in, you will be redirected back to the Common Fate Access Controls page, where you will notice that the Slack integration is now **online**.
+
+5. To finalise the Slack integration you will need to configure which Slack channel or approvers the Common Fate bot will send messages into. This is done with the `commonfate` Terraform provider.
+
+Here is a simple default workflow that will send notifications for approvals to the specified Slack channel.
+
+```hcl
+resource "commonfate_slack_alert" "example" {
+  slack_channel_id   = "C05M7Q489E3"
+  slack_workspace_id = "T03ND9EB6RM"
+  workflow_id        = commonfate_access_workflow.demo.id
+  integration_id     = commonfate_slack_integration.slack.id
+}
+```
+
+- The `commonfate_slack_alert` resource can be configured to send messages to a specified channel using the `slack_channel_id` field.
+- Alternatively you can configure it to send direct messages to all the approvers of the request with the `send_direct_message_to_approvers` field.
+
+Here is a simple default workflow that will send notifications for approvals to the the approvers of the request.
+```hcl
+resource "commonfate_slack_alert" "example" {
+  send_direct_message_to_approvers = true // cannot be used in conjunction with slack_channel_id
+  slack_workspace_id = "T03ND9EB6RM"
+  workflow_id        = commonfate_access_workflow.demo.id
+  integration_id     = commonfate_slack_integration.slack.id
+}
+```
+
+## Adding the client to multiple Slack workspaces
+
+It is possible with the Common Fate / Slack integration to add it into multiple Slack workspaces.
+To do so you will need to enable _Public Distribution_ in the Slack config and update some of Terraform config. Here is how you can do this.
+
+### In Slack
+
+1. Navigate to https://api.slack.com/apps
+2. Find your App by selecting it from the list
+3. Select **Manage Distribution**
+4. Under **Share Your App with Other Workspaces** make sure you have all the checks ticked and select **Activate Public Distribution**
+5. You will now be able to install it into other Slack Workspaces.
+
+### In Common Fate
+
+Add another `commonfate_slack_integration` resource into your Terraform config. Make sure to use the same client id and secret as your first integration, but give it a different name.
+
+```hcl
+resource "commonfate_slack_integration" "slack" {
+  name                       = "Slack"
+  client_id                  = <slack client id>
+  client_secret_secret_path  = "/common-fate/prod/slack-client-secret"
+  signing_secret_secret_path = "/common-fate/prod/slack-signing-secret"
+}
+```
+
+## Using multiple Slack integrations
+
+When using multiple slack integrations you will need to specify explicitly which integration a slack alert will go into.
+
+To update this make sure you have a `commonfate_slack_alert` for each integration you have added. For example:
+
+```hcl
+resource "commonfate_slack_integration" "slack" {
+  name                       = "Slack"
+  client_id                  = <slack client id>
+  client_secret_secret_path  = "/common-fate/prod/slack-client-secret"
+  signing_secret_secret_path = "/common-fate/prod/slack-signing-secret"
+}
+
+resource "commonfate_slack_alert" "example" {
+  slack_channel_id   = "<channel_id>" // make sure these point to the correct channel within the workspace
+  slack_workspace_id = "<workspace_id>" // make sure these point to the correct workspace
+  workflow_id        = commonfate_access_workflow.aws1.id
+  integration_id     = commonfate_slack_integration.slack.id
+}
+
+resource "commonfate_slack_integration" "slack2" {
+  name                       = "Slack2"
+  client_id                  = <slack client id>
+  client_secret_secret_path  = "/common-fate/prod/slack-client-secret"
+  signing_secret_secret_path = "/common-fate/prod/slack-signing-secret"
+}
+
+resource "commonfate_slack_alert" "example2" {
+  slack_workspace_id = "<workspace_id>" // make sure these point to the correct workspace
+  workflow_id        = commonfate_access_workflow.aws1.id
+  integration_id     = commonfate_slack_integration.slack2.id
+  send_direct_message_to_approvers = true
+
+}
+
+```
+
+```
+terraform apply
+```
+
+Run through the setup flow the same way you did for the first integration.
+
+## Requiring approval inside the web console
+
+By default, the Common Fate Slack integration will perform an approval inside of Slack when a user presses the 'Approve' button on a Slack message.
+
+![By default, when the 'Approve' button is pressed, Common Fate will approve the request inside of Slack.](/images/cf-request-slack-screenshot.png)
+
+For more sensitive entitlements, you may prefer to disable this behaviour and require that approvals are performed inside the Common Fate web console, so that you can enforce SAML SSO on approval actions.
+
+<Aside>
+Customising Slack approval behaviour requires the following minimum versions:
+
+- `v2.13.1` or later of the [Common Fate Terraform Provider](https://registry.terraform.io/providers/common-fate/commonfate/latest).
+
+- `v1.32.0` or later of the `common-fate/common-fate-deployment/aws` Terraform module, f you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account.
+
+</Aside>
+
+To require approval inside the web console, set `use_web_console_for_approval_action` to `true` in the `commonfate_slack_alert` resource.
+
+```diff
+resource "commonfate_slack_alert" "example" {
+  slack_channel_id                    = "<channel_id>"
+  slack_workspace_id                  = "<workspace_id>"
+  workflow_id                         = commonfate_access_workflow.aws1.id
+  integration_id                      = commonfate_slack_integration.slack.id
++ use_web_console_for_approval_action = true
+}
+```
+
+To apply your changes, re-run `terraform apply`.
+
+## Support
+
+If you need assistance with this integration, please contact [support@commonfate.io](mailto:support@commonfate.io), or join our Slack community [here](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg), we're happy to help!

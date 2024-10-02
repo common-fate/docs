@@ -1,0 +1,21 @@
+---
+title: "Introduction"
+description: "Learn how to access to entitlements available in Common Fate."
+---
+
+## Introduction
+
+In order to use Common Fate to grant least-privileged access to your entitlements, you'll need to set up integrations and policies.
+
+To avoid confusion, we make a distinction between Application Configuration and Infrastructure Configuration:
+
+| Type                         | Description                                                                      | Examples                                                                             |
+| ---------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Application Configuration    | Configuration of Common Fate itself                                              | Setting up access policies which defines which entitlements are available to request |
+| Infrastructure Configuration | Configuration of the infrastructure to create your Common Fate deployment in AWS | Configuration of the VPC that your Common Fate application runs inside of            |
+
+Common Fate uses Terraform to manage all application-level configuration. To avoid any dependency issues between the infrastructure and application layers we recommend using a separate Terraform root module for your Application Configuration.
+
+Without configuring resources and plugins into Common Fate, the deployment is a bit of an empty shell. It is an integral part of the set up to have some configuration set for your deployment.
+
+All Application Configuration is created and managed using the [`commonfate` Terraform Provider](https://registry.terraform.io/providers/common-fate/commonfate/latest). Refer to [our provider documentation](https://registry.terraform.io/providers/common-fate/commonfate/latest/docs) for detailed guidance on the available Terraform resources.

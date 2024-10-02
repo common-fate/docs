@@ -1,0 +1,131 @@
+---
+title: "Troubleshooting"
+banner:
+  content: |
+    Get audited access to RDS databases without a VPN using the Granted RDS Plugin.
+    <a href="/granted-rds">Learn more here</a>.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+# Troubleshooting
+
+## Manually configuring your shell profile
+
+If you keep your shell profile in a non-standard location, Granted may fail to install the alias. If this happens, you can manually add the alias to your shell profile. Some examples are included below to assist you:
+
+### Bash
+
+Add the following to `~/.bash_profile`:
+
+```bash
+alias assume="source assume"
+```
+
+### ZSH
+
+Add the following to `~/.zshenv`:
+
+```bash
+alias assume="source assume"
+```
+
+### Fish
+
+Add the following to `~/.config/fish/config.fish`:
+
+```bash
+alias assume="source /usr/local/bin/assume.fish"
+```
+
+<Aside>
+
+After adding the alias to your shell profile manually, if Granted does not detect that the alias is configured, please run `export GRANTED_ALIAS_CONFIGURED="true"` before running `assume` to bypass the setup process.
+
+</Aside>
+
+## AWS SSO issues
+
+### Regions
+
+Entering the wrong `sso_region` will result in this cryptic looking error:
+
+![Invalid SSO Region Error](./images/invalid-sso-region.png)
+
+If you don't know which SSO region your AWS organization is in, you'll need to check with whoever set up your AWS SSO service. Alternatively, you can just guess until you get it right. There's only [twenty-one](https://docs.aws.amazon.com/general/latest/gr/sso.html) of them.
+
+### UnauthorizedException: Session token not found or invalid
+
+If you receive the following error when running `assume`:
+
+```bash
+[✘] operation error SSO: GetRoleCredentials, https response error StatusCode: 401, RequestID: 39287367-65d6-41bc-a01f-ebc34b65e5b4, UnauthorizedException: Session token not found or invalid
+```
+
+Run the following steps to resolve the issue:
+
+1. Clear the AWS SSO plaintext token cache:
+  ```bash
+  rm -rf ~/.aws/sso/cache
+  ```
+
+  After completing this step, retry running `assume`. If `assume` still fails, continue below.
+
+2. Clear the Granted CLI cache:
+  ```bash
+  granted cache clear
+  ```
+
+3. If you are using MacOS, open Keychain Access and remove any entries starting with `granted` in the login keychain.
+
+4. Run the Granted `credential-process` command and inspect the output:
+  ```bash
+  granted credential-process --profile=<name of AWS profile you want to access>
+  ```
+
+  If you receive an error such as the following:
+  ```
+  [✘] error when retrieving credentials from custom process. please login using 'granted sso login --sso-start-url https://example.awsapps.com/start --sso-region us-east-1'
+  ```
+
+  Run the corresponding Granted command to reauthenticate.
+
+5. If you are still running into issues with `assume` and AWS SSO, you can use the `--no-cache` or set the `GRANTED_NO_CACHE` environment variable to `true`, which forces a refresh of AWS session tokens.
+
+```bash
+assume --no-cache
+
+# also configurable via the GRANTED_NO_CACHE environment variable
+export GRANTED_NO_CACHE=true
+```
+
+If you are using the [Granted Credential Process integration](/granted/recipes/credential-process), you can opt out of session token caching for a particular AWS command as follows:
+
+```bash
+# 'aws sts get-caller-identity' is an example AWS command
+GRANTED_NO_CACHE=true aws sts get-caller-identity --profile example-profile-using-granted-credential-process
+```
+
+
+## Where does Granted store its settings?
+
+Granted settings are in `~/.granted`. If your trying to find where a setting is coming from, also check these directories:
+
+- `~/.aws`
+- `~/.password-store`
+- `~/.gnupg`
+- `~/.local/share/keyrings`
+
+## gpg: decryption failed: no secret key
+
+If you are trying to use `pass`, [make sure you followed the instructions](./recipes/pass.md). Note that `export GPG_TTY=$(tty)` must have been executed in the current shell so that you can be asked for your password.
+
+## Granted stopped working (Windows)
+
+On Windows in WSL2, Granted can sometimes stop working completely. The solution is to reboot.
+
+## Other issues
+
+If you have any other issues with Granted please [send us a message on Slack](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg) and we'll help you out. Alternatively, you can also shoot us a [Twitter message](https://twitter.com/CommonFateTech).
+
+Please don't hesitate to reach out! We want to make Granted work for everyone and we're keen to help you with any problems you might encounter.

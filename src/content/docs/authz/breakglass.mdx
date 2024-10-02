@@ -1,0 +1,49 @@
+---
+title: "Breakglass Access"
+description: "Enabling breakglass access."
+---
+
+Breakglass access allows a user to optionally bypass approval requirements on an access request in situations where it is required.
+By default, no breakglass access is permitted in your Common Fate deployment.
+
+You can enable breakglass access by adding a cedar policy.
+
+
+```js
+// Allow all users to request breakglass access to all resources
+permit (
+    principal,
+    action == Access::Action::"BreakglassActivate",
+    resource
+);
+
+// Allow all users to request breakglass access to specific resources
+permit (
+    principal,
+    action == Access::Action::"Activate",
+    resource is AWS::IDC::AccountGrant
+)
+when { resource.target in [AWS::Account::"12345678912"] };
+
+// Allow the security team to access any account using breakglass access
+@advice("You can use breakglass access for this request because you are on the security team")
+permit (
+    principal in Entra::Group::"ID_OF_SECURITY_GROUP",
+    action == Access::Action::"BreakglassActivate",
+    resource
+);
+```
+
+### Using Breakglass to Activate a Request
+
+When breakglass is permitted for one or more entitlements on an access request, a user will see a breakglass checkbox above the *Activate* button on the request detail page in the web console.
+This breakglass checkbox will only be shown when the user has permission to use breakglass to activate one or more of the entitlements on their request.
+
+![Breakglass Screenshot](./images/breakglass-screenshot.png)
+
+### Detecting Usage of Breakglass Access
+
+When a grant is activated using breakglass, an event will be emitted with the action type "grant.breakglass_activated".
+You can configure event processing to detect this event type and trigger as action as required.
+
+For teams with slack notifications configured, when breakglass access is used, the slack notifications will have an additional alert section indicating that breakglass was used.

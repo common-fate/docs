@@ -1,0 +1,18 @@
+---
+title: "Troubleshooting"
+description: "A guide to identifying and resolving common errors"
+---
+
+### Error: CNAMEAlreadyExists
+
+If you encounter the following error when deploying `main.tf`:
+
+```
+Error: creating Cognito User Pool Domain:
+InvalidParameterException: One or more of the CNAMEs you provided are already associated with a different resource.
+(Service: AmazonCloudFront; Status Code: 409; Error Code: CNAMEAlreadyExists; Request ID: f7546b6a-b6fe-47e0-9c60-ec313aa6d54c; Proxy: null)
+```
+
+#### Fix
+
+This error is caused mostly because your Auth domain (e.g., auth.commonfate.example.com) has an existing A record. Remove the record and then rerun `terraform apply`.

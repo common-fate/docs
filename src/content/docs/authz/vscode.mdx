@@ -1,0 +1,46 @@
+---
+title: "Developing with Visual Studio Code"
+description: "Learn how to author Common Fate authorization policies with Visual Studio Code."
+---
+
+Common Fate uses [authorization policy-as-code](/authz/introduction) powered by [Cedar](https://www.cedarpolicy.com/). To get immediate feedback and automatic code completion when you are writing Cedar policies, you can use the [Cedar extension](https://marketplace.visualstudio.com/items?itemName=cedar-policy.vscode-cedar) for [Visual Studio Code (VS Code)](https://code.visualstudio.com/).
+
+![Screenshot of Cedar VS Code extension with autocomplete feature.](./images/cedar-vscode-autocomplete.png)
+
+## Prerequisites
+
+If you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account, you'll need to be on `v1.31.0` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+You'll also need the [Common Fate `cf` CLI installed](/user-guide/cli/quickstart) - v1.12.0 or higher. You can check this by running `cf --version`. You should see an output similar to the below
+
+```bash
+cf --version
+cf version v1.12.0
+# version must be v1.12.0 or higher for this guide.
+```
+
+## Installing the VS Code extension
+
+Install the extension by clicking the **Install** button on the [VS Code marketplace listing](https://marketplace.visualstudio.com/items?itemName=cedar-policy.vscode-cedar).
+
+Common Fate uses Cedar v3. Currently, Cedar v3 is supported in the _pre-release version_ of the Cedar extension.
+
+After you've installed the extension, change to the pre-release version by navigating to the **Extensions** sidebar then choosing **Cedar** from the list of installed extensions. Click the **Switch to Pre-Release Version** button.
+
+![Common Fate uses Cedar v3, which requires the pre-release version of the Cedar VS Code extension.](./images/cedar-vscode-prerelease.png)
+
+## Downloading the Cedar schema
+
+To provide automatic code completion and live validation, the Cedar VS Code extension requires a Cedar schema file to be present in your workspace. This file must have the extension `.cedarschema.json`.
+
+In the VS Code editor terminal, run the following command to download the schema and save it as `common-fate.cedarschema.json`:
+
+```bash
+cf authz schema get > common-fate.cedarschema.json
+```
+
+## Using the extension
+
+After installing the extension, open the `common-fate-policy-testing` folder in VS Code. Try editing the policy. You will see live validation and automatic code completion similar to the below.
+
+![Screenshot of Cedar VS Code extension with policy editing](./images/cedar-vscode-screenshot.png)

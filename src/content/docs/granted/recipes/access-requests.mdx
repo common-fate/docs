@@ -1,0 +1,50 @@
+---
+title: "Just-In-Time (JIT) access to roles"
+---
+
+Granted can be used with [Common Fate](/introduction) for just-in-time access to privileged AWS roles.
+
+## Prerequisites
+
+For this recipe, you'll need a Common Fate deployment. [Email us](support@commonfate.io) or [message us on Slack](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg) to arrange a Common Fate licence key for a proof-of-concept deployment.
+
+You'll also need Granted **v0.23.0 or later** installed.
+
+You can use Granted to request just-in-time access to roles. Internally, we use AWS [credential_process](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html) to source credentials through Granted.
+
+You will need to update each role you want to request access to with the following configuration:
+
+```diff
+- [profile my-profile]
+- sso_account_id = <your-sso-account-id>
+- sso_region     = <your-sso-region>
+- sso_role_name  = <your-role-name>
+- sso_start_url  = <https://example.awsapps.com/start>
+
++ [profile updated-profile]
++ granted_sso_account_id = <your-sso-account-id>
++ granted_sso_region     = <your-sso-region>
++ granted_sso_role_name  = <your-role-name>
++ granted_sso_start_url  = <https://example.awsapps.com/start>
++ credential_process     = granted credential-process --profile updated-profile
++ common_fate_url        = https://commonfate.example.com # the URL of your Common Fate deployment
+```
+
+Providing the `common_fate_url` is optional. If it is not provided, Granted will look up the Common Fate API URL from the [Common Fate TOML config file](/user-guide/config).
+
+Now, try assuming a profile that you don't currently have access to. For example:
+
+```
+ > assume production-access-role
+```
+
+You should see an output similar to the below, depending on the [authorization policies](/authz/introduction) you've configured in Common Fate.
+
+```
+ > assume production-access-role
+
+[i] You don't currently have access to production-access-role, checking if we can request access...	[target=AWS::Account::"123456789012", role=AWSAdministratorAccess, url=https://commonfate.example.com]
+[WILL ACTIVATE] AWSAdministratorAccess access to Sandbox-2 will be activated for 2h: https://commonfate.example.com/access/requests/req_2eoefaC9KCuIiOAZ541JsOlU97t
+[i] Access::Grant::"gra_2eoefkXzQap0kjm6O8fzrLwUbaz": Access is automatically approved because you are on-call in PagerDuty
+? Apply proposed access changes (y/N)
+```

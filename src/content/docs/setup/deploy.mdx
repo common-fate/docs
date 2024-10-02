@@ -1,0 +1,158 @@
+---
+title: "Deploying Common Fate"
+description: "This guide outlines the steps for deploying the Common Fate IAM platform using Terraform to your AWS environment. In this guide, you'll provisioning AWS resources, set up Single-Sign-On login, and configure DNS for your deployment."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import { Card } from '@astrojs/starlight/components';
+
+## **Prerequisites**
+
+- An AWS account with necessary permissions. We recommend creating a dedicated AWS account within your organization for Common Fate.
+- Terraform installed and configured.
+- Access to DNS settings for domain configuration.
+
+## Deployment Process
+
+The following guide should be used in conjunction with our [BYOC starter config](https://github.com/common-fate/byoc-aws-starter-config).
+
+<Aside>
+  If you're deploying into an existing VPC or want to limit network ingress to
+  your Common Fate deployment, refer to our [BYOVPC starter config](https://github.com/common-fate/byovpc-starter-config).
+</Aside>
+
+### Domain Configuration
+
+In order for your deployment to be accessible through HTTPS you need to configure DNS and register HTTPS certificates with [AWS Certificate Manager](https://aws.amazon.com/certificate-manager/).
+
+Steps:
+
+- **ACM Certificate (Target Region)**: Create an ACM certificate in the target deployment region. Include the following domains:
+
+  - Application domain e.g (commonfate.example.com)
+
+After creating the ACM certificate you will need to configure the DNS verification records in your DNS provider.
+
+Once ACM shows that your domains are verified, you can continue with the deployment.
+
+### Initial Deployment
+
+Create a new folder called `deployment`. In the folder, create a `main.tf` file as follows:
+
+```hcl
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  version               = "2.3.2"
+  aws_region            = "<your target region>"
+
+  licence_key = <your Common Fate licence key>
+
+  app_certificate_arn   = <your domain certificate ARN>
+
+  // Replace this with your actual domain
+  app_url            = "https://commonfate.example.com"
+}
+
+output "first_time_setup_config" {
+  description = "Common Fate Setup Config"
+  value       = module.common-fate-deployment.first_time_setup_config
+}
+
+output "control_plane_task_role_arn" {
+  value = module.common-fate-deployment.control_plane_task_role_arn
+}
+
+output "outputs" {
+  description = "outputs"
+  value       = module.common-fate-deployment.outputs
+}
+
+output "terraform_client_secret" {
+  description = "terraform client secret"
+  value       = module.common-fate-deployment.terraform_client_secret
+
+  sensitive = true
+}
+```
+
+Run the first deployment
+
+```bash
+terraform apply
+```
+
+You should see an output like the below from Terraform. You will need to reference this in the next steps.
+
+```bash
+Outputs:
+
+first_time_setup_config = {
+  "dns_cname_record_for_app_domain": "your-app-domain.your-aws-region.elb.amazonaws.com",
+  "dns_cname_record_for_auth_domain": "your-cloudfront-domain.net",
+  "saml_sso_acs_url": "https://your-auth-domain/saml2/idpresponse",
+  "saml_sso_entity_id": "urn:amazon:cognito:sp:us-west-2_yourEntityID"
+}
+```
+
+<Aside>
+By default, the module deploys a VPC with NAT Gateways across three Availability Zones (AZs). If you'd like to reduce the hosting cost of your Common Fate deployment, you can opt to use a single NAT Gateway:
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+
++ single_nat_gateway     = true
++ one_nat_gateway_per_az = false
+}
+```
+</Aside>
+
+### DNS Configuration
+
+Now that your Application Load Balancer is deployed, you can configure your DNS records.
+
+For your App domain create a CNAME record pointing to the `dns_cname_record_for_app_domain` from the `first_time_setup_config` deployment outputs. This will route traffic through to the Common Fate services.
+
+After deploying you can test everything is working by opening your App domain in a browser and you should be directed to the login screen.
+
+### Set up SSO authentication
+
+Your users will sign in to Common Fate using SAML SSO. Follow a guide below for your identity provider:
+
+<Card
+  title="Set up SSO with Microsoft Entra"
+  icon="link"
+  href="/integrations/sso/entra"
+>
+  Set up SSO using Microsoft Entra.
+</Card>
+
+<Card
+  title="Set up SSO with AWS IAM Identity Center"
+  icon="link"
+  href="/integrations/sso/aws-idc"
+>
+  Set up SSO using AWS IAM Identity Center.
+</Card>
+
+<Card title="Set up SSO with Okta" icon="link" href="/integrations/sso/okta">
+  Set up SSO using Okta.
+</Card>
+
+### Set up integrations
+
+<Card
+  title="Set up notifications with Slack"
+  icon="link"
+  href="/integrations/slack"
+>
+  Notify and approve access inside of Slack.
+</Card>
+
+<Card
+  title="Integrate with PagerDuty"
+  icon="link"
+  href="/integrations/pagerduty"
+>
+  Approve access contextually based on PagerDuty on-call status.
+</Card>

@@ -1,0 +1,486 @@
+---
+title: "Google Cloud"
+description: "Setup guide for the Common Fate GCP integration."
+---
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This guide will walk you through integrating Common Fate with Google Cloud (GCP). At the end of this guide you'll have a functioning integration with Common Fate reading your account inventory and provisioning access to entitlements.
+
+## GCP Setup
+
+Common Fate is hosted in your AWS account, and uses Workload Identity Federation to authenticate to GCP Service Accounts. By default, we use two Service Accounts: one for reading available entitlements and a separate one for assigning access. If you want to keep things simple you can combine these into a single role, but we recommend using two separate roles to give you easy visibility as to when the provisioning role is being used.
+
+Before you deploy any resources you'll need to created a dedicated project in Google Cloud for our integration. You can call this project "Common Fate".
+
+You'll also need access to a role with the ability to create role bindings in your GCP organization.
+
+The permissions that the read role uses are:
+
+- iam.roles.get
+- iam.roles.list
+- resourcemanager.folders.get
+- resourcemanager.folders.list
+- resourcemanager.organizations.get
+- resourcemanager.projects.get
+- resourcemanager.projects.list
+- resourcemanager.tagKeys.list
+- resourcemanager.tagValues.list
+- cloudasset.assets.listResource
+
+The permissions that the provision role uses are:
+
+- resourcemanager.projects.getIamPolicy
+- resourcemanager.projects.setIamPolicy
+- resourcemanager.folders.getIamPolicy
+- resourcemanager.folders.setIamPolicy
+
+<Tabs>
+  <TabItem label="Using Terraform">
+We have developed a [reference integration Terraform module](https://github.com/common-fate/terraform-aws-common-fate-deployment/blob/main/modules/gcp-integration/workload-identity-roles/main.tf) which deploys the following resources:
+
+- A Workload Identity Pool
+- A Workload Identity Pool Provider linked to the Common Fate AWS account
+- Custom IAM Roles for the reader and provisioner, deployed to the organization
+- Service Accounts for the reader and provisioner, deployed to the dedicated Common Fate GCP project you created above
+- Role bindings with attribute bindings allowing the Common Fate Control Plane and Provisioner roles to obtain Service Account credentials.
+
+<Aside>
+  This Terraform module requires sensitive organizational-level GCP permissions.
+  Because of this, we recommend deploying this module in a separate Terraform
+  root module to your Common Fate deployment. This avoids having a single
+  Terraform deployment with privileged access to both your Common Fate
+  deployment, and to your GCP organization.
+</Aside>
+
+1. To deploy the reference integration first, create a dedicated project in Google Cloud called "Common Fate"
+
+2. Follow this link to enable the required APIs on your new project: [https://console.cloud.google.com/flows/enableapi?apiid=cloudasset.googleapis.com,iam.googleapis.com,cloudresourcemanager.googleapis.com,iamcredentials.googleapis.com,sts.googleapis.com&redirect=https://console.cloud.google.com](https://console.cloud.google.com/flows/enableapi?apiid=cloudasset.googleapis.com,iam.googleapis.com,cloudresourcemanager.googleapis.com,iamcredentials.googleapis.com,sts.googleapis.com&redirect=https://console.cloud.google.com)
+
+3. Create a new Terraform root module with the following module:
+
+```hcl
+module "common-fate-gcp-roles" {
+  source                                = "common-fate/common-fate-deployment/aws//modules/gcp-integration/workload-identity-roles"
+  version                               = "1.38.0"
+  gcp_project                           = "<ID of the GCP project you created above, excluding the '/project' prefix>"
+  common_fate_aws_account_id            = "<Common Fate AWS Account ID>"
+  gcp_organization_id                   = "<Your GCP organization ID>"
+  common_fate_aws_reader_role_name      = "common-fate-prod-control-plane-ecs-tr"
+  common_fate_aws_provisioner_role_name = "common-fate-prod-provisioner-ecs-tr"
+}
+```
+
+If you've customised the names of your reader and provisioner roles from our defaults, you'll need to update the `common_fate_aws_reader_role_name` and `common_fate_aws_provisioner_role_name` above.
+
+  </TabItem>
+
+  <TabItem label="Using the GCP Console">
+
+1. Create a dedicated project in Google Cloud called "Common Fate"
+
+2. Follow this link to enable the required APIs on your new project: [https://console.cloud.google.com/flows/enableapi?apiid=cloudasset.googleapis.com,iam.googleapis.com,cloudresourcemanager.googleapis.com,iamcredentials.googleapis.com,sts.googleapis.com&redirect=https://console.cloud.google.com](https://console.cloud.google.com/flows/enableapi?apiid=cloudasset.googleapis.com,iam.googleapis.com,cloudresourcemanager.googleapis.com,iamcredentials.googleapis.com,sts.googleapis.com&redirect=https://console.cloud.google.com)
+
+3. Create a service account in the Project, call it Common Fate Read. Copy the email address of your service account, as you'll need it when assigning organization roles.
+
+4. Create a service account in the Project, call it Common Fate Provision. Copy the email address of your service account, as you'll need it when assigning organization roles.
+
+5. Switch to the root organization project in GCP and create a role called "Common Fate Read" with the following permissions:
+
+   - iam.roles.get
+   - iam.roles.list
+   - resourcemanager.folders.get
+   - resourcemanager.folders.list
+   - resourcemanager.organizations.get
+   - resourcemanager.projects.get
+   - resourcemanager.projects.list
+   - resourcemanager.tagKeys.list
+   - resourcemanager.tagValues.list
+   - cloudasset.assets.listResource
+
+6. Switch to the organization project in GCP and create a role called "Common Fate Provision" with the following permissions:
+
+   - resourcemanager.projects.getIamPolicy
+   - resourcemanager.projects.setIamPolicy
+   - resourcemanager.folders.getIamPolicy
+   - resourcemanager.folders.setIamPolicy
+
+7. Go to the **IAM** page and go to the **Permissions** tab. Grant the Common Fate Read service account permission to the "Common Fate Read" role that you just created in the organization.
+
+8. Go to the **IAM** page and go to the **Permissions** tab. Grant the Common Fate Provision service account permission to the "Common Fate Provision" role that you just created in the organization.
+
+9.Go to the **Workload Identity Pools** page in your new project "Common Fate" [https://console.cloud.google.com/iam-admin/workload-identity-pools](https://console.cloud.google.com/iam-admin/workload-identity-pools)
+
+10. Create a new identity pool called "Common Fate"
+
+11. Add the AWS Provider, call it "Common Fate" and set the id to "common-fate" then add the AWS account ID where the application is deployed.
+
+12. On the Configure provider attributes step, you can leave the defaults, which are listed below for reference
+
+```
+google.subject = assertion.arn
+attribute.aws_role = assertion.arn.contains('assumed-role') ? assertion.arn.extract('{account_arn}assumed-role/') + 'assumed-role/' + assertion.arn.extract('assumed-role/{role_name}/') : assertion.arn
+```
+
+13. Go to the **Workload Identity Pools** page and select your new identity pool.
+
+14. Select Grant Access, select Common Fate Read from the service account drop down.
+
+15. Select the `aws_role` attribute, and set the value to `arn:aws:sts::${common_fate_aws_account_id}:assumed-role/${common_fate_aws_reader_role_name}`, where `common_fate_aws_account_id` is the Common Fate AWS account ID and `common_fate_aws_reader_role_name` is the IAM role name of the `control_plane_task_role_arn` output from the common-fate-deployment module Terraform.
+
+16. Save the access then download the JSON file when prompted, save this for later when you update the terraform deployment
+
+17. Go to the **Workload Identity Pools** page and select your new identity pool.
+
+18. Select Grant Access, select Common Fate Provision from the service account drop down.
+
+19. Select the `aws_role` attribute, and set the value to `arn:aws:sts::${common_fate_aws_account_id}:assumed-role/${common_fate_aws_reader_role_name}`, where `common_fate_aws_account_id` is the Common Fate AWS account ID and `common_fate_aws_reader_role_name` is the IAM role name of the `task_role_arn` output from the provisioner module Terraform deployment.
+
+20. Save the access then download the json file when prompted, save this for later when you update the terraform deployment
+
+  </TabItem>
+</Tabs>
+
+## Configuring Common Fate
+
+In this section, you will register the GCP integration with your Common Fate deployment. At the end of this section you should have Common Fate reading GCP resources and see them inside of the web dashboard. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).
+
+Obtain your GCP organization ID (it should look like `organizations/12312324167`). Obtain your Google Workspace Customer ID (it should look like `C02abcde123`).
+
+<Aside>
+  You can find your Google Workspace Customer ID in the Google Admin console
+  ([https://admin.google.com](https://admin.google.com)). Log in using the same
+  email as used in GCP. You'll find the customer ID under >Account >Account
+  settings.
+</Aside>
+
+Inside your Application Configuration repository, add the following module:
+
+```hcl
+resource "commonfate_gcp_integration" "main" {
+  name                         = "GCP"
+  organization_id              = "<Your GCP organization ID, including the 'organizations/' prefix>"
+  google_workspace_customer_id = "<Your Google Workspace Customer ID>"
+  reader_workload_identity_config = jsonencode(<your reader Workload Identity Config>)
+}
+```
+
+Apply the changes. If the apply succeeds, you should see the integration appear on the settings page in the web dashboard, and GCP resources should populate within 10 minutes.
+
+If after 10 minutes you do not see resources appear, check the logs of the `common-fate-prod-control-plane` service in ECS. You can search for `gcp` to filter for structured logs containing data about the GCP integration.
+
+## Provisioning access to GCP
+
+To make GCP projects available for Just-In-Time (JIT) access you can add a `commonfate_gcp_project_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_gcp_project_selector` in conjunction with a `commonfate_gcp_project_availabilities` and `commonfate_access_workflow` resources.
+
+We've included some examples below.
+
+### Select a project by ID
+
+```hcl
+resource "commonfate_gcp_project_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::Project::"replace-this-with-your-project-id"
+  EOT
+}
+```
+
+### Select multiple projects by ID
+
+```hcl
+resource "commonfate_gcp_project_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::Project::"replace-this-with-your-project-id" || resource == GCP::Project::"some-other-project-id"
+  EOT
+}
+```
+
+### Select projects based on a naming pattern
+
+Select projects with a name ending in `-prod`:
+
+```hcl
+resource "commonfate_gcp_project_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "*-prod"
+  EOT
+}
+```
+
+Select projects with a name beginning with `develop`:
+
+```hcl
+resource "commonfate_gcp_project_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "develop*"
+  EOT
+}
+```
+
+### Select projects belonging to a particular folder
+
+```hcl
+resource "commonfate_gcp_project_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::Folder::"folders/1234567890"
+  EOT
+}
+```
+
+### Select projects belonging to a particular tag key
+
+```hcl
+resource "commonfate_gcp_project_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::TagKey::"tagKeys/1234567890123"
+  EOT
+}
+```
+
+### Select projects belonging to a particular tag value
+
+```hcl
+resource "commonfate_gcp_project_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::TagValue::"tagValues/1234567890123"
+  EOT
+}
+```
+
+## GCP folder selectors
+
+To make GCP folders available for Just-In-Time (JIT) access you can add a `commonfate_gcp_folder_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_gcp_folder_selector` in conjunction with a `commonfate_gcp_folder_availabilities` and `commonfate_access_workflow` resources:
+
+```hcl
+// the selector resource chooses which targets
+resource "commonfate_gcp_folder_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::Folder::"replace-this-with-your-folder-id"
+  EOT
+}
+
+// the availability resource binds the targets to an Access Workflow
+// with a particular role.
+resource "commonfate_gcp_folder_availabilities" "demo" {
+  workflow_id                  = commonfate_access_workflow.demo.id
+  gcp_folder_selector_id       = commonfate_gcp_folder_selector.example.id
+  gcp_role                     = "roles/resourcemanager.folderAdmin"
+  google_workspace_customer_id = "<Your Google Customer ID>"
+}
+```
+
+We've included some examples below.
+
+### Select a folder by ID
+
+```hcl
+resource "commonfate_gcp_folder_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::Folder::"replace-this-with-your-folder-id"
+  EOT
+}
+```
+
+### Select multiple folders by ID
+
+```hcl
+resource "commonfate_gcp_folder_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::Folder::"replace-this-with-your-folder-id" || resource == GCP::Folder::"some-other-folder-id"
+  EOT
+}
+```
+
+### Select folders based on a naming pattern
+
+Select folders with a name ending in `-prod`:
+
+```hcl
+resource "commonfate_gcp_folder_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "*-prod"
+  EOT
+}
+```
+
+Select folders with a name beginning with `develop`:
+
+```hcl
+resource "commonfate_gcp_folder_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "develop*"
+  EOT
+}
+```
+
+### Select folders belonging to a particular folder
+
+```hcl
+resource "commonfate_gcp_folder_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::Folder::"folders/1234567890"
+  EOT
+}
+```
+
+## Organization-level access
+
+Common Fate optionally supports provisioning just-in-time organization-level access to GCP. To provision access, the Common Fate provisioner role needs the following additional permissions:
+
+- resourcemanager.organizations.getIamPolicy
+- resourcemanager.organizations.setIamPolicy
+
+If you used our [reference integration Terraform module](https://github.com/common-fate/terraform-aws-common-fate-deployment/blob/main/modules/gcp-integration/workload-identity-roles/main.tf) to deploy the GCP roles, you can add these permissions by providing the `permit_organization_provisioning` variable:
+
+```diff
+module "common-fate-gcp-roles" {
+  source                                = "common-fate/common-fate-deployment/aws//modules/gcp-integration/workload-identity-roles"
+  version                               = "1.38.0"
+  gcp_project                           = "<ID of the GCP project you created above, excluding the '/project' prefix>"
+  common_fate_aws_account_id            = "<Common Fate AWS Account ID>"
+  gcp_organization_id                   = "<Your GCP organization ID>"
+  common_fate_aws_reader_role_name      = "common-fate-prod-control-plane-ecs-tr"
+  common_fate_aws_provisioner_role_name = "common-fate-prod-provisioner-ecs-tr"
++ permit_organization_provisioning      = true
+}
+```
+
+To make organization roles available for Just-In-Time (JIT) access you can add a `commonfate_gcp_organization_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code.
+
+You'll need to use the `commonfate_gcp_folder_selector` in conjunction with a `commonfate_gcp_folder_availabilities` and `commonfate_access_workflow` resources:
+
+```hcl
+// the selector resource chooses which targets
+resource "commonfate_gcp_organization_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+}
+
+// the availability resource binds the targets to an Access Workflow
+// with a particular role.
+resource "commonfate_gcp_organization_availabilities" "demo" {
+  workflow_id                  = commonfate_access_workflow.demo.id
+  gcp_organization_selector_id = commonfate_gcp_folder_selector.example.id
+  gcp_role                     = "roles/editor"
+  google_workspace_customer_id = "<Your Google Customer ID>"
+}
+```
+
+You’ll additionally need to add the following Provisioner registration inside your Application Configuration repository:
+
+```hcl
+resource "commonfate_webhook_provisioner" "prod" {
+  url = "http://common-fate-prod-builtin-provisioner.common-fate-prod-builtin.internal:9999"
+  capabilities = [
+    {
+      target_type = "GCP::Organization"
+      role_type   = "GCP::Role"
+      belonging_to = {
+        type = "GCP::Organization"
+        id   = "organizations/123456789123"
+      }
+    },
+  ]
+}
+```
+
+## GCP Role Group access
+
+Common Fate allows you to streamline permissions across multiple GCP roles by defining role groups. Role groups enable you to bundle multiple predefined roles, such as `folder admin` and `owner`, into a single entity. Users can then request access to these role groups, for GCP projects or folders.
+
+To define a role group, use the `commonfate_gcp_role_group` resource:
+
+```hcl
+resource "commonfate_gcp_role_group" "example" {
+  name               = "example"
+  gcp_organization_id = "<Your GCP organization ID>"
+  role_ids           = ["roles/editor", "roles/owner"]
+}
+```
+
+To make a GCP role group available for Just-In-Time (JIT) access, you can add a `commonfate_gcp_role_group_folder_availabilities` or `commonfate_gcp_role_group_project_availabilities` [Availability](/config/availabilities) resource to your Common Fate application Terraform code:
+
+```hcl
+resource "commonfate_gcp_role_group_folder_availabilities" "gcp-role-group-folder" {
+  workflow_id              = commonfate_access_workflow.demo.id
+  gcp_role_group           = commonfate_gcp_role_group.example.id
+  gcp_folder_selector_id   = commonfate_gcp_folder_selector.demo.id
+  google_workspace_customer_id = "<Your Google Customer ID>"
+}
+
+resource "commonfate_gcp_role_group_project_availabilities" "gcp-role-group-project" {
+  workflow_id              = commonfate_access_workflow.demo.id
+  gcp_role_group           = commonfate_gcp_role_group.example.id
+  gcp_project_selector_id = commonfate_gcp_project_selector.demo.id
+  google_workspace_customer_id = "<Your Google Customer ID>"
+}
+```
+
+You’ll additionally need to add the following Provisioner registration inside your Application Configuration repository:
+
+```hcl
+resource "commonfate_webhook_provisioner" "prod" {
+  url = "http://common-fate-prod-builtin-provisioner.common-fate-prod-builtin.internal:9999"
+  capabilities = [
+    {
+      target_type = "GCP::Project"
+      role_type   = "GCP::RoleGroup"
+      belonging_to = {
+        type = "GCP::Organization"
+        id   = "organizations/123456789123"
+      }
+    },
+    {
+      target_type = "GCP::Folder"
+      role_type   = "GCP::RoleGroup"
+      belonging_to = {
+        type = "GCP::Organization"
+        id   = "organizations/123456789123"
+      }
+    },
+  ]
+}
+```

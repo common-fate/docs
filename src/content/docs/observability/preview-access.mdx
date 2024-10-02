@@ -1,0 +1,67 @@
+---
+title: "Preview Access"
+description: "Preview the access which is granted by your authorization policies."
+---
+
+The preview module helps you to easily check the following:
+
+- All the entitlements that a given user can access
+- All the users who can access a given entitlement
+- Debug the policies allowing or forbidding a user to access a specific entitlement
+
+## Prerequisites
+
+If you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account, you'll need to be on `v1.39.0` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+## Grant the required permissions
+
+By default, users in Common Fate don't have permission to view authorization logs. To give yourself access, you'll need to add a Cedar policy allowing the `CF::Authz::Action::"PreviewAccess"` action. To grant yourself access you'll need your Common Fate user ID.
+
+Find your Common Fate user ID in the web console by clicking on your profile in the lower corner, as shown below.
+
+![Find User ID](/images/cf-find-user-id.png)
+
+Your user ID should look something like `usr_2ZaVKh5QwjlPsy1ImKc6GY2XbAf`.
+
+Then, [add a Cedar policy](/authz/introduction#deploying-authorization-policies-to-terraform) which grants access to the `CF::Authz::Action::"PreviewAccess"` action:
+
+```js
+permit(
+  principal == CF::User::"<YOUR_USER_ID_HERE>", // replace with your user ID, e.g. CF::User::"usr_2ZaVKh5QwjlPsy1ImKc6GY2XbAf"
+  action == CF::Authz::Action::"PreviewAccess",
+  resource
+);
+```
+
+Alternatively, you can grant yourself access to actions in the `CF::Admin::Action::"Read"` group, which contains all read-only administrative actions. `CF::Authz::Action::"PreviewAccess"` belongs to `CF::Admin::Action::"Read"`. To grant access using this approach, apply the following policy:
+
+```js
+permit(
+  principal == CF::User::"<YOUR_USER_ID_HERE>", // replace with your user ID, e.g. CF::User::"usr_2ZaVKh5QwjlPsy1ImKc6GY2XbAf"
+  action in CF::Admin::Action::"Read", // important: use 'in' rather than '==', because this is a group of actions
+  resource
+);
+```
+
+## Usage
+
+Once you've granted yourself access you should see a **Preview** item appear in the navbar on the left of the web console. Click on the **Preview** item to view the available previews.
+
+![Preview Index](/images/preview/index.png)
+
+You can view the entitlements available for a specific user to request by selecting them from the drop down menu.
+The table shows whether their access would be automatically approved and which Cedar policy IDs which led to the decision.
+
+Click on the policy IDs to open a debugging view which lets you view the full Cedar policy as well as the entities which were included in the authorization.
+![User Preview](/images/preview/user.png)
+
+You can view the users who are able to request access to an entitlement by selecting a target and role from the drop down menus.
+The table shows whether their access would be automatically approved and which Cedar policy IDs which led to the decision.
+
+Click on the policy IDs to open a debugging view which lets you view the full Cedar policy as well as the entities which were included in the authorization.
+
+![Entitlement Debug View](/images/preview/entitlement.png)
+
+You can debug the authorization for any user and entitlement in the debugger. You can use this to debug why a user does or does not have access to a particular entitlement.
+
+![Debug Authorization](/images/preview/debug.png)

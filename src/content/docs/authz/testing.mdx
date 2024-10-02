@@ -1,0 +1,125 @@
+---
+title: "Testing"
+description: "Learn how to write tests for access and group membership."
+---
+
+import { LinkCard } from '@astrojs/starlight/components';
+
+Common Fate uses [authorization policy-as-code](/authz/introduction) powered by [Cedar](https://www.cedarpolicy.com/). In this guide, you'll learn how to write tests to verify the behaviour of your Cedar policies and confirm that Common Fate resource syncing is working as expected.
+
+The Common Fate CLI allows tests to be written using a YAML file in the following format:
+
+```yaml
+# group-tests test whether a user is a member of a group or not.
+group-tests:
+- user: alice@example.com
+  group: 2df6c5c4-0e09-477a-b796-9ad9bd756d83
+  is-member: true
+
+# access-tests test whether a user is allowed to access a particular entitlement or not.
+access-tests:
+- user: alice@example.com
+  target: development-aws-account
+  role: AWSReadOnlyAccess
+  expected-result: auto-approved
+
+- user: alice@example.com
+  # you can also use Cedar entity IDs here for the target or role
+  target: AWS::Account::"123456789012"
+  role: AWS::IDC::PermissionSet::"3d06e8e5-93d3-4bfd-ae4f-e5caf43c99ad"
+  expected-result: requires-approval
+
+- user: alice@example.com
+  target: very-sensitive-aws-account
+  role: AWSReadOnlyAccess
+  expected-result: no-access
+```
+
+## Prerequisites
+
+If you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account, you'll need to be on `v1.31.0` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+You will need the [Common Fate `cf` CLI installed](/user-guide/cli/quickstart) - v1.15.1 or higher. You can check this by running `cf --version`. You should see an output similar to the below:
+
+```bash
+cf --version
+cf version v1.15.1
+# version must be v1.15.1 or higher for this guide.
+```
+
+## Creating a test file using the CLI
+
+To create a new test file, run the following command:
+
+```bash
+cf tests create -f tests.yml
+```
+
+You should see an output as follows:
+
+```
+[✔] created tests.yml
+```
+
+After creating a tests file, edit the file in your code editor to add users, groups and entitlements based on your deployment.
+
+## Running tests using the CLI
+
+To run tests, use the command:
+
+```bash
+cf tests run -f tests.yml
+```
+
+You should see an output similar to the below, containing the results of the tests:
+
+```
+retrieving users for email address lookups...
+retrieved 126 users
+-------------- ACCESS TESTS --------------
+running 2 access tests...
+
+[PASS] chris@commonfate.io requires-approval to Sandbox-1 with role ViewOnlyAccess
+
+[FAIL] chris@commonfate.io auto-approved to Sandbox-2 with role ViewOnlyAccess: got requires-approval
+	policies contributing to requesting access: [basic.policy0]
+	policies contributing to activating access: []
+
+-------------- GROUP MEMBERSHIP TESTS --------------
+running 2 group membership tests...
+
+[PASS] chris@commonfate.io is member of c9bed4d8-d091-7057-4ed7-6d60bcf1e8bf
+
+[PASS] chris@commonfate.io is not member of 790e94a8-2071-7016-a43c-86e66212a43d
+
+1 Access Tests failed
+All Group Membership Tests passed
+```
+
+If any access tests fail, the Cedar policies contributing to the authorization decision will be shown below. For example:
+
+```
+[FAIL] chris@commonfate.io auto-approved to Sandbox-2 with role ViewOnlyAccess: got requires-approval
+	policies contributing to requesting access: [basic.policy0]
+	policies contributing to activating access: []
+```
+
+In the output above, the `basic.policy0` policy is allowing the user to request access, and there are no policies allowing the user to activate the access. The policies are in the format `<policy ID>.policyN`, where `<policy ID>` is the ID of the Cedar policy set specified in Terraform, and `N` is the index of the policy in the policy set.
+
+Policy sets can contain multiple policies as shown below:
+
+```js
+// if the policy set has the ID 'basic'
+
+// this policy will be 'basic.policy0'
+permit(principal, action == Access::Action::"Request", resource);
+
+// this policy will be 'basic.policy1'
+permit(principal, action == Access::Action::"Approve", resource);
+```
+
+## Next steps
+
+<LinkCard title="Running access tests in CI" href="/authz/ci#access-testing-in-ci">
+  Learn how to run access tests in your CI/CD platform.
+</LinkCard>

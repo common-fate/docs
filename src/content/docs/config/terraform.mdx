@@ -1,0 +1,192 @@
+---
+title: "Setup Common Fate Terraform Provider"
+description: "This guide outlines the steps for configuring the Common Fate Terraform provider."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+
+## **Prerequisites**
+
+- Terraform installed and configured.
+- An active Common Fate deployment and access to the deployment Terraform code.
+
+## Folder Structure
+
+We recommend creating a different folder for setting up the configuration and for each integration. We have an example for AWS here: [https://github.com/common-fate/byoc-aws-starter-config](https://github.com/common-fate/byoc-aws-starter-config)
+
+```
+├── aws-integration
+   └── main.tf
+├── config
+   ├── main.tf
+   └── aws_idc.tf
+└── deployment
+    └── main.tf
+```
+
+## Requirements
+
+This guide will walk you through setting up the `commonfate` Terraform provider. This guide will be only for getting the provider configured with your Common Fate deployment.
+
+For more information about each of the different resources these are documented on the provider registry page: https://registry.terraform.io/providers/common-fate/commonfate/latest/docs
+
+The provider requires some variables for it to work with your deployment. All of these variables can be found from your deployment Terraform outputs.
+
+Our Terraform provider uses a machine-to-machine OpenID Connect (OIDC) protocol to authenticate to Common Fate. The AWS Cognito user pool deployed with Common Fate acts as the OIDC issuer.
+
+<Aside>
+  We're considering adding support for additional OIDC provider authentication,
+  such as GitHub Actions and Spacelift. Let your Common Fate account manager
+  know if you'd like to see this implemented.
+</Aside>
+
+Here's an example of a configured `provider` block:
+
+```hcl
+terraform {
+  required_providers {
+    commonfate = {
+      source  = "common-fate/commonfate"
+      version = "2.13.0"
+    }
+  }
+}
+
+provider "commonfate" {
+  api_url            = "http://commonfate.example.com"
+  oidc_client_id     = "349dfdfkljwerpoizxckf3fds345xcvv" # terraform_client_id from deployment/main.tf's terraform output
+  oidc_issuer        = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_jieDxjtS" # auth_issuer from deployment/main.tf's terraform output
+}
+```
+
+You'll also need to set the `CF_OIDC_CLIENT_SECRET` environment variable in the environment that your Terraform is running in. If you're using a CI/CD runner like GitHub Actions we recommend storing this as a secret and injecting this when the Terraform plan/apply runs. To get the value of `CF_OIDC_CLIENT_SECRET`, you need to run `terraform output terraform_client_secret` in deployment/main.tf.
+
+## Configuring the Terraform Provider using environment variables
+
+You can optionally configure the `commonfate` Terraform Provider using environment variables. When using environment variables for configuration, leave the provider block empty:
+
+```hcl
+terraform {
+  required_providers {
+    commonfate = {
+      source  = "common-fate/commonfate"
+      version = "2.13.0"
+    }
+  }
+}
+
+provider "commonfate" {}
+```
+
+Then, set the specified variables when running `terraform` commands:
+
+```bash
+export CF_API_URL=http://commonfate.example.com
+export CF_OIDC_CLIENT_ID=349dfdfkljwerpoizxckf3fds345xcvv # terraform_client_id from deployment/main.tf's terraform output
+export CF_OIDC_CLIENT_SECRET=XXXXXXX # terraform_client_secret from deployment/main.tf's terraform output
+export CF_OIDC_ISSUER=https://cognito-idp.us-east-1.amazonaws.com/us-east-1_jieDxjtS # auth_issuer from deployment/main.tf's terraform output
+
+terraform plan
+```
+
+## Finding deployment outputs
+
+<Aside>
+  You will need to make sure you have the following outputs in your deployment
+  Terraform code. If you used one of our boilerplate Terraform examples these
+  should be included
+</Aside>
+
+```hcl outputs.tf
+output "outputs" {
+  description = "outputs"
+  value       = module.common-fate-deployment.outputs
+}
+
+output "terraform_client_secret" {
+description = "terraform client secret"
+value = module.common-fate-deployment.terraform_client_secret
+sensitive = true
+}
+```
+
+To get the values you need for each of the provider variables you will need to get the outputs from the deployment Terraform.
+
+This can be done by running the following in the root of the Terraform files:
+
+Make sure you have AWS credentials for the account your Common Fate is deployed to
+```
+
+assume <role_to_access_deployment> -r <region_of_deployment>
+
+```
+Run the output command to get a list of outputs.
+```
+
+terraform output -json
+
+```
+
+You should see an output like this:
+```
+
+"app_url": {
+"sensitive": false,
+"type": "string",
+"value": ""
+},
+"auth_url": {
+"sensitive": false,
+"type": "string",
+"value": ""
+},
+"oidc_issuer": {
+"sensitive": false,
+"type": "string",
+"value": ""
+},
+...
+
+````
+
+The variables we need are:
+- app_url
+- oidc_issuer
+- terraform_client_id
+- terraform_client_secret
+
+Use these variables in place like this:
+
+```hcl
+
+provider "commonfate" {
+  api_url = <app_url>
+  oidc_client_id = <terraform_client_id>
+  oidc_client_secret = <terraform_client_secret>
+  oidc_issuer = <oidc_issuer>
+}
+
+````
+
+# Read-Only Client Credentials
+
+You may also wish to use the read-only credentials for some workflows, these have access to read policies and configuration, but cannot make any changes to your infrastructure.
+
+The variables we need are:
+
+- read_only_client_id
+- read_only_client_secret
+
+Use these variables in place like this:
+
+```hcl
+
+provider "commonfate" {
+  api_url = <app_url>
+  oidc_client_id = <read_only_client_id>
+  oidc_client_secret = <read_only_client_secret>
+  oidc_issuer = <oidc_issuer>
+}
+
+```

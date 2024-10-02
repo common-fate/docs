@@ -1,0 +1,63 @@
+---
+title: "How different Assumers work in Granted"
+---
+
+## Overview
+
+There are multiple ways to set up your AWS config file for authentication and access credentials.
+
+Granted which is powered by [Go under the hood](https://github.com/common-fate/granted) uses an “Assumer” interface abstraction which can be customized for specific config profiles as per the requirement.
+
+[The Assumer Interface is implemented as:](https://github.com/common-fate/granted/blob/main/pkg/cfaws/assumers.go)
+
+```go
+
+type Assumer interface {
+	// AssumeTerminal should follow the required process for it implementation and return aws credentials ready to be exported to the terminal environment
+	AssumeTerminal(context.Context, *Profile, ConfigOpts) (aws.Credentials, error)
+	// AssumeConsole should follow any console specific credentials processes, this may be the same as AssumeTerminal under the hood
+	AssumeConsole(context.Context, *Profile, ConfigOpts) (aws.Credentials, error)
+	// A unique key which identifies this assumer e.g AWS-SSO or GOOGLE-AWS-AUTH
+	Type() string
+	// ProfileMatchesType takes a list of strings which are the lines in an aws config profile and returns true if this profile is the assumers type
+	ProfileMatchesType(*ini.Section, config.SharedConfig) bool
+}
+
+```
+
+Any struct that implements these four methods and returns AWS credentials is a valid Assumer.
+
+## Different Assumers
+
+Currently, Granted implements 5 different types of Assumer.
+
+### AWS IAM Assumer
+
+IAM Assumer is for IAM-specific credentials in AWS SHARED CREDENTIALS file or any IAM credentials that are imported to secure storage via the `granted credentials` command.
+
+This assumer also handles cases for [using IAM roles](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-role.html). In this case, the AssumeTerminal method will use the source profile's credentials to call AWS Security Token Service (AWS STS) and request temporary credentials for the specified role. The returned credentials will be cached and stored in secured storage via Granted.
+
+### AWS IAM SSO Assumer
+
+IAM SSO Assumer is for authenticating users with AWS IAM Identity Center (successor to AWS Single Sign-On). Here, we complete a device code flow to retrieve an SSO token which is used to retrieve STS short-term credentials for a given role name that is assigned to the user. The returned credentials will be cached and stored in secured storage via Granted.
+
+### AWS Credential Process Assumer
+
+[AWS supports a way to source credentials via an external process](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-sourcing-external.html). For example:
+
+```go
+[profile developer]
+credential_process = /opt/bin/awscreds-custom --username helen
+```
+
+This Assumer will retrieve the AWS credentials by executing the credential process command.
+
+### AWS Google Auth Assumer
+
+AWS Google Auth Assumer is used for acquiring AWS temporary (STS) credentials using Google Apps as a federated (Single Sign-On, or SSO) provider. This Assumer simply wraps [aws-google-auth](https://github.com/cevoaustralia/aws-google-auth) tool to fetch the AWS credentials.
+
+### AWS Azure Assumer
+
+AWS Azure Assumer is used for acquiring AWS temporary (STS) credentials using [Azure Active Directory](https://azure.microsoft.com/) to provide SSO login to the AWS. This Assumer simply wraps [aws-azure-login](https://github.com/aws-azure-login/aws-azure-login) tool to fetch the AWS credentials.
+
+Don't see an Assumer for your requirement? You can contribute to our OSS project or let us know via our community Slack or Github issue tracker.

@@ -1,0 +1,123 @@
+---
+title: "CLI Quickstart"
+description: "Get started using the Common Fate CLI to request access."
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+In this guide you'll install and learn how to use the `cf` CLI to request access to entitlements.
+
+## Installing
+
+We release precompiled binaries of the Common Fate CLI for MacOS, Linux and Windows. The CLI itself is [open-sourced here](https://github.com/common-fate/cli). Choose instructions corresponding to your operating system below.
+
+<Tabs>
+<TabItem label="MacOS">
+
+[Homebrew](https://brew.sh/) is an open source package manager for MacOS. We publish a Homebrew formula for the Common Fate CLI. To install the CLI with Homebrew, run the command below in your terminal.
+
+```
+brew install common-fate/tap/cf
+```
+
+</TabItem>
+<TabItem label="Linux">
+
+Select the steps which match your system architecture. You can find your architecture by running `uname -m` from a terminal window.
+
+<Tabs>
+<TabItem label="x86_64">
+
+```
+curl -OL releases.commonfate.io/cf/v1.10.0/cf_1.10.0_linux_x86_64.tar.gz
+sudo tar -zxvf ./cf_1.10.0_linux_x86_64.tar.gz -C /usr/local/bin/
+
+```
+
+</TabItem>
+<TabItem label="arm64">
+
+```
+
+curl -OL releases.commonfate.io/cf/v1.10.0/cf_1.10.0_linux_arm64.tar.gz
+sudo tar -zxvf ./cf_1.10.0_linux_arm64.tar.gz -C /usr/local/bin/
+
+```
+
+</TabItem>
+<TabItem label="i386">
+
+```
+curl -OL releases.commonfate.io/cf/v1.10.0/cf_1.10.0_linux_i386.tar.gz
+sudo tar -zxvf ./cf_1.10.0_linux_i386.tar.gz -C /usr/local/bin/
+
+```
+
+</TabItem>
+</Tabs>
+
+</TabItem>
+
+<TabItem label="Windows">
+
+First, download the zip archive of the Common Fate CLI which matches your system's architecture. You can find your architecture by viewing your system properties in the Control Panel.
+
+[cf for Windows x86_64](https://releases.commonfate.io/cf/v1.10.0/cf_1.10.0_windows_x86_64.zip)
+
+[cf for Windows arm64](https://releases.commonfate.io/cf/v1.10.0/cf_1.10.0_windows_arm64.zip)
+
+[cf for Windows i386](https://releases.commonfate.io/cf/v1.10.0/cf_1.10.0_windows_i386.zip)
+
+After downloading the CLI, unzip the package.
+
+You'll need to move `cf` to a folder that is accessible on your `PATH`. [This StackOverflow link](https://stackoverflow.com/questions/1618280/where-can-i-set-path-to-make-exe-on-windows) has instructions on how to do this.
+
+If you are using `cf` with the [Git Bash shell on Windows](https://gitforwindows.org), we recommend enabling experimental support for pseudo consoles. You may need to reinstall Git For Windows to enable this. You can read more about this [here](https://github.com/cli/cli/issues/404).
+
+</TabItem>
+
+</Tabs>
+
+## Verify the installation
+
+You can verify the integrity and authenticity of the binary you have downloaded by running through the [verification process here](https://docs.commonfate.io/granted/security#release-verification). We use the same GPG keys to sign the Common Fate binary as we do for the Granted CLI shown in the linked documentation.
+
+## First-time CLI setup
+
+To configure the CLI to communicate with your Common Fate deployment, run:
+
+```
+cf
+```
+
+The first time you run the CLI you'll be prompted for your deployment URL. This is the URL that you access your web dashboard through, such as `https://commonfate.example.com`. After you've entered your dashboard, the CLI will attempt to log you in.
+
+The CLI will also set up a TOML configuration file in `~/.cf/config` containing the OIDC authentication information associated with your deployment. This file will look something like this:
+
+```toml
+current_context = "default"
+
+[context]
+  [context.default]
+    api_url = "https://commonfate.example.com"
+    oidc_issuer = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_012345abcdef"
+    oidc_client_id = "3128763128763asvbadkjasd"
+```
+
+To discover the available commands in the CLI, you can run:
+
+```
+cf --help
+```
+
+You can now use the CLI to request access to entitlements. You can list the available entitlements with:
+
+```
+cf access list available
+```
+
+And request access with:
+
+```
+cf access ensure --target <target> --role <role>
+```

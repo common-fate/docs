@@ -1,0 +1,74 @@
+---
+title: "Config TOML reference"
+description: "A reference on the format for the `cf` CLI configuration file (`~/.cf/config` by default)"
+---
+
+The Common Fate CLI uses a local TOML file for configuration. By default, the CLI looks in `~/.cf/config` for this file.
+
+This can be overridden by specifying the following environment variables:
+
+| Environment variable | Default        | Description                                                                                                   |
+| -------------------- | -------------- | ------------------------------------------------------------------------------------------------------------- |
+| `CF_CONFIG_PATH`     | `~/.cf/config` | The path to look for the TOML config file.                                                                    |
+| `CF_CONFIG_SOURCES`  | `env,file`     | The config sources to use in order of precendence. `env` is environment variables, `file` is the config file. |
+
+## Config file format
+
+An example TOML config file is shown below:
+
+```toml
+current_context = "default"
+
+[context]
+  [context.default]
+    api_url = "https://commonfate.example.com"
+    oidc_issuer = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_012345abcdef"
+    oidc_client_id = "3128763128763asvbadkjasd"
+```
+
+A context may contain the following keys specified below. Each configuration value may be overridden by an environment variable. By default, environment variables take precendence over config file values.
+
+| Key                  | Environment variable    | Required | Description                                                                                                                                                                                                         |
+| -------------------- | ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api_url`            | `CF_API_URL`            | Yes      | The API URL to connect to                                                                                                                                                                                           |
+| `access_url`         | `CF_ACCESS_URL`         | No       | The Access URL to connect to (serves APIs for requesting and approving access). Defaults to the API URL if not provided and is used for development. In regular deployments this should not be overridden.          |
+| `authz_url`          | `CF_AUTHZ_URL`          | No       | The Authz URL to connect to (serves APIs for reading resources and authorizing actions). Defaults to the API URL if not provided and is used for development. In regular deployments this should not be overridden. |
+| `oidc_issuer`        | `CF_OIDC_ISSUER`        | Yes      | The OIDC issuer for authenticating with Common Fate.                                                                                                                                                                |
+| `oidc_client_id`     | `CF_OIDC_CLIENT_ID`     | Yes      | The OIDC client ID for authenticating with Common Fate.                                                                                                                                                             |
+| `oidc_client_secret` | `CF_OIDC_CLIENT_SECRET` | No       | The OIDC client secret for authenticating with Common Fate. If specified, the CLI will use machine-to-machine authentication to obtain an OIDC access token.                                                        |
+
+## Config file contexts
+
+If you have multiple Common Fate deployments, you can add additional `context` keys to your config file. The `current_context` key must point to the current context you wish to use.
+
+```toml
+current_context = "staging"
+
+[context]
+  [context.production]
+    api_url = "https://commonfate.example.com"
+    oidc_issuer = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_012345abcdef"
+    oidc_client_id = "3128763128763asvbadkjasd"
+
+  [context.staging]
+    api_url = "https://staging.commonfate.example.com"
+    oidc_issuer = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_23456xyz"
+    oidc_client_id = "5555666677778888XYZABC"
+```
+
+## Using machine-to-machine authentication
+
+It is possible to run the Common Fate CLI in non-interactive environments by specifying the `oidc_client_secret` configuration variable, or setting the `CF_OIDC_CLIENT_SECRET` environment variable.
+
+Here is an example:
+
+```diff
+current_context = "default"
+
+[context]
+  [context.default]
+    api_url = "https://commonfate.example.com"
+    oidc_issuer = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_012345abcdef"
+    oidc_client_id = "3128763128763asvbadkjasd"
++   oidc_client_secret = "XXXXYYYYYYZZZZZZ"
+```

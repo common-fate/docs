@@ -1,0 +1,118 @@
+---
+title: "DataStax"
+description: "Setup guide for the Common Fate DataStax integration."
+---
+import { Aside } from '@astrojs/starlight/components';
+
+This guide will walk you through integrating Common Fate with DataStax. By the end of this guide, you'll have a functioning integration with Common Fate, allowing it to provision access to DataStax Roles.
+
+## DataStax Setup
+
+To configure the DataStax integration, follow these steps to create an Application Token in your DataStax console. First, [Sign In into DataStax](https://accounts.datastax.com/session-service/v1/login).
+
+A. Create the Role for the API Token:
+
+1. Browse to Settings > Role
+2. Click **Add Custom Role**
+3. Enter a name e.g 'Common Fate Provision Role'
+4. Select the following permissions:
+
+- Read Audits
+- Write User
+- Write Organization
+- Write Custom Role
+- Read IP Access List
+- Read CMK Key
+- Read External Auth
+- Read Token
+- Read Integrations
+![DataStax Permissions](/images/datastax/permissions.png)
+
+5. Click **Create Role**
+
+B. Create the API Token:
+
+1. Browse to Settings > Tokens.
+2. Select the Role you created
+3. Click **Generate Token**
+4. Save the newly created token somewhere safe for the next steps.
+
+You will need to create a new `SecretString` in SSM Parameter Store and then use the path when configuring your deployment in Terraform.
+
+You can use the AWS CLI to create a secret in the region you are deploying to. you must use the following path `"/<namespace>/<stage>/<secret name>"`.
+
+```bash
+aws ssm put-parameter \
+    --name "/common-fate/prod/datastax-api-key" \
+    --value "mySecretValue" \
+    --type "SecureString"
+```
+
+## Configuring Common Fate
+
+<Aside>
+  Integration with DataStax requires a minimum version v1.20.0 or later of the
+  [Common Fate Deployment
+  module](https://github.com/common-fate/terraform-aws-common-fate-deployment).
+</Aside>
+
+In this section, you will register the DataStax integration with your Common Fate deployment. At the end of this section you should have Common Fate ready to provision access. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).
+
+Inside your Application Configuration repository, add the following module:
+
+```hcl
+resource "commonfate_datastax_integration" "DataStax" {
+  name = "DataStax"
+  api_key_secret_path = "/common-fate/prod/datastax-api-key"
+}
+```
+
+Apply the changes. If the apply succeeds, you should see the integration appear on the settings page in the web dashboard.
+
+## Provisioning access to DataStax Roles
+
+You can now create an access workflow and availabilities:
+
+```hcl
+
+locals {
+  datastax_org_id = <Your DataStax Org ID>
+}
+
+resource "commonfate_access_workflow" "datastax" {
+  name                     = "DataStax"
+  access_duration_seconds  = 60 * 60 * 2
+  priority                 = 1
+}
+
+resource "commonfate_selector" "datastax_org" {
+  id            = "datastax_org"
+  resource_type = "DataStax::Organization"
+  belonging_to = {
+    type = "DataStax::Organization"
+    id   = local.datastax_org_id
+  }
+  when = <<EOT
+  true
+  EOT
+}
+
+
+resource "commonfate_availability_spec" "datastax" {
+  workflow_id = commonfate_access_workflow.demo.id
+  role = {
+    type = "DataStax::Role"
+    id   = <Your DataStax Role ID>
+  }
+
+  target = {
+    type = "Access::Selector"
+    id   = commonfate_selector.datastax_org.id
+  }
+  identity_domain = {
+    type = "DataStax::Organization"
+    id   = local.datastax_org_id
+  }
+}
+
+```

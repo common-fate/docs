@@ -1,0 +1,253 @@
+---
+title: "BigQuery"
+description: "Setup guide for the Common Fate BigQuery integration."
+---
+
+This guide will walk you through integrating Common Fate with BigQuery. At the end of this guide you'll have a functioning integration with Common Fate reading your dataset inventory and provisioning access to BigQuery data.
+
+## Prerequisites
+
+If you're running a BYOC ("Bring-Your-Own-Cloud") deployment of Common Fate in your own AWS account, you'll need to be on `v1.38.0` or later of the `common-fate/common-fate-deployment/aws` Terraform module.
+
+You'll also need to have [set up the Common Fate GCP integration](/integrations/gcp) before adding BigQuery.
+
+## BigQuery Setup
+
+To provision access to BigQuery, the Common Fate provisioner role needs the following additional permissions:
+
+- bigquery.tables.getIamPolicy
+- bigquery.tables.setIamPolicy
+- bigquery.datasets.getIamPolicy
+- bigquery.datasets.setIamPolicy
+
+If you used our [reference integration Terraform module](https://github.com/common-fate/terraform-aws-common-fate-deployment/blob/main/modules/gcp-integration/workload-identity-roles/main.tf) to deploy the GCP roles, you can add these permissions by providing the `permit_bigquery_provisioning` variable:
+
+```diff
+module "common-fate-gcp-roles" {
+  source                                = "common-fate/common-fate-deployment/aws//modules/gcp-integration/workload-identity-roles"
+  version                               = "1.38.0"
+  gcp_project                           = "<ID of the GCP project you created above, excluding the '/project' prefix>"
+  common_fate_aws_account_id            = "<Common Fate AWS Account ID>"
+  gcp_organization_id                   = "<Your GCP organization ID>"
+  common_fate_aws_reader_role_name      = "common-fate-prod-control-plane-ecs-tr"
+  common_fate_aws_provisioner_role_name = "common-fate-prod-provisioner-ecs-tr"
++ permit_bigquery_provisioning          = true
+}
+```
+
+## Configuring Common Fate
+
+To grant and revoke access to BigQuery, add the following Provisioner registration inside your Application Configuration repository:
+
+```hcl
+resource "commonfate_webhook_provisioner" "prod" {
+ url = "http://common-fate-prod-builtin-provisioner.common-fate-prod-builtin.internal:9999"
+  capabilities = [
+    {
+      target_type = "GCP::BigQuery::Dataset"
+      role_type   = "GCP::Role"
+      belonging_to = {
+        type = "GCP::Organization"
+        id   = "organizations/123456789123"
+      }
+    },
+    {
+      target_type = "GCP::BigQuery::Table"
+      role_type   = "GCP::Role"
+      belonging_to = {
+        type = "GCP::Organization"
+        id   = "organizations/123456789123"
+      }
+    }
+  ]
+}
+```
+
+## Just-In-Time access to BigQuery Datasets
+
+To make BigQuery datasets available for Just-In-Time (JIT) access you can add a `commonfate_gcp_bigquery_dataset_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_bigquery_dataset_selector` in conjunction with a `commonfate_bigquery_dataset_availabilities` and `commonfate_access_workflow` resources.
+
+We've included some examples below.
+
+### Select a dataset by ID
+
+```hcl
+resource "commonfate_bigquery_dataset_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::BigQuery::Dataset::"replace-this-with-your-dataset-id"
+  EOT
+}
+```
+
+### Select multiple datasets by ID
+
+```hcl
+resource "commonfate_bigquery_dataset_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::BigQuery::Dataset::"replace-this-with-your-dataset-id" || resource == GCP::BigQuery::Dataset::"some-other-dataset-id"
+  EOT
+}
+```
+
+### Select datasets based on a naming pattern
+
+Select datasets with a name ending in `-prod`:
+
+```hcl
+resource "commonfate_bigquery_dataset_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "*-prod"
+  EOT
+}
+```
+
+Select datasets with a name beginning with `develop`:
+
+```hcl
+resource "commonfate_bigquery_dataset_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "develop*"
+  EOT
+}
+```
+
+### Select datasets in a particular project
+
+```hcl
+resource "commonfate_bigquery_dataset_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::Project::"my-example-project"
+  EOT
+}
+```
+
+### Select datasets in a particular folder
+
+```hcl
+resource "commonfate_bigquery_dataset_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::Folder::"folders/1234567890"
+  EOT
+}
+```
+
+## Just-In-Time access to BigQuery Tables
+
+To make BigQuery tables available for Just-In-Time (JIT) access you can add a `commonfate_gcp_bigquery_table_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_gcp_bigquery_table_selector` in conjunction with a `commonfate_bigquery_table_availabilities` and `commonfate_access_workflow` resources.
+
+We've included some examples below.
+
+### Select a table by ID
+
+```hcl
+resource "commonfate_bigquery_table_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::BigQuery::Dataset::"replace-this-with-your-dataset-id"
+  EOT
+}
+```
+
+### Select multiple tables by ID
+
+```hcl
+resource "commonfate_bigquery_table_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource == GCP::BigQuery::Dataset::"replace-this-with-your-dataset-id" || resource == GCP::BigQuery::Dataset::"some-other-dataset-id"
+  EOT
+}
+```
+
+### Select tables based on a naming pattern
+
+Select tables with a name ending in `-prod`:
+
+```hcl
+resource "commonfate_bigquery_table_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "*-prod"
+  EOT
+}
+```
+
+Select tables with a name beginning with `develop`:
+
+```hcl
+resource "commonfate_bigquery_table_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource.name like "develop*"
+  EOT
+}
+```
+
+### Select tables in a particular dataset
+
+```hcl
+resource "commonfate_bigquery_table_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::BigQuery::Dataset::"example-project-2-411516:example_dataset"
+  EOT
+}
+```
+
+### Select tables in a particular project
+
+```hcl
+resource "commonfate_bigquery_table_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::Project::"my-example-project"
+  EOT
+}
+```
+
+### Select tables in a particular folder
+
+```hcl
+resource "commonfate_bigquery_table_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  gcp_organization_id = = "<Your GCP Organization ID>"
+  when                = <<EOT
+  resource in GCP::Folder::"folders/1234567890"
+  EOT
+}
+```

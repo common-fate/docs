@@ -1,0 +1,26 @@
+---
+title: "Introduction"
+description: "An overview of the Common Fate platform."
+---
+
+Identity is now the cloud security perimeter. With every new cloud service or application that is adopted and with every new employee hired comes an increase in security risk. Over time, cloud environments become a web of identities and complex manage, govern and secure.
+
+Effective access control is critical to reduce identity risk, but unfortunately comes with implementation challenges: slow and manual request processes, friction in engineering workflows and scalability problems.
+
+Common Fate is an authorization engine for internal access, which automates cloud access for engineers using centralised context and workflows.
+
+Common Fate is designed to be hosted in your own cloud environment and is [deployed using Terraform](/setup/deploy).
+
+## Access Workflows
+
+Common Fate supports access workflows to allow end users in your organization to securely access production cloud environments.
+
+![Common Fate New Access Screenshot](../../assets/cf-new-access-screenshot.png)
+
+![Common Fate Request Screenshot](../../assets/cf-request-screenshot.png)
+
+Using Common Fate's [authorization policies](/authz/introduction) you can define policies for automated and manual approvals, and [route access requests through Slack](/integrations/slack). Policies can include contextual information about the user and resource, such as:
+
+- if the user is on-call in [PagerDuty](/integrations/pagerduty) or [OpsGenie](/integrations/opsgenie)
+- attributes on the resource the user is accessing, such as the AWS account or GCP project tags
+- group membership from your corporate identity provider such as Microsoft Entra

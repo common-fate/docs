@@ -1,0 +1,67 @@
+---
+title: "Custom login domain"
+description: "Learn how to use a custom sign-in URL for your Common Fate deployment."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+By default, your Common Fate deployment will have a random sign-in URL which looks something like this:
+
+```
+https://cf-auth-settled-cub.auth.ap-southeast-2.amazoncognito.com
+```
+
+This guide will walk you through using a custom domain for this sign-in URL. At the end of this guide, instead of your users seeing the domain above, they'll see something like:
+
+```
+https://auth.commonfate.example.com
+```
+
+## **Prerequisites**
+
+- An AWS account with necessary permissions.
+- Terraform installed and configured.
+- Access to DNS settings for domain configuration.
+
+## Domain Configuration
+
+Create a certificate in the **`us-east-1`** region for the AWS Cognito hosted authentication UI. When prompted, use the custom domain that you plan to use for authentication - e.g auth.commonfate.example.com.
+
+If the parent domain of the auth domain does not resolve to an IP address, create a temporary A record in your DNS configuration. Example: if using `auth.commonfate.example.com`, ensure `commonfate.example.com` resolves to an IP (e.g., **`8.8.8.8`**). This is a temporary record needed for the initial deployment. This is an AWS requirement when configuring a custom domain for AWS Cognito and is a necessary bootstrapping step for your initial deployment.
+
+<Aside>
+  [This AWS Knowledge Center
+  page](https://repost.aws/knowledge-center/cognito-custom-domain-errors) has
+  more information about this.
+</Aside>
+
+After creating the ACM certificates you will need to configure the DNS verification records in your DNS provider.
+
+Once ACM shows that your domains are verified, you can continue with the deployment.
+
+## Update your Terraform module
+
+Update your `common-fate-deployment` Terraform module to add the `auth_certificate_arn` and `auth_url` as follows:
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++ auth_certificate_arn  = <your auth certificate ARN in us-east-1>
++ auth_url           = "https://auth.commonfate.example.com" // change this to your actual desired authentication domain.
+}
+
+output "first_time_setup_config" {
+  description = "Common Fate Setup Config"
+  value       = module.common-fate-deployment.first_time_setup_config
+}
+```
+
+## Final DNS Configuration
+
+Now that your AWS Cognito resources are deployed, you can configure your DNS records.
+
+1. If you configured a temporary A record for the root domain of your auth domain, it can now be removed.
+2. For your Auth domain, create a CNAME record pointing to the `user_pool_cloudfront_distribution` from the deployment outputs.
+3. After deploying you can test everything is working by opening your Web domain in a browser and you should be directed to the login screen. The login UI should now be hosted at the custom domain that you've specified.

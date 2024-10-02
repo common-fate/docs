@@ -1,0 +1,159 @@
+---
+title: "Entra"
+description: "Setup guide for the Common Fate Entra integration."
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This guide will walk you through integrating Common Fate with Entra (Formerly Azure AD). By the end of this guide, you'll have a functioning integration with Common Fate, allowing it to provision access to Entra Groups.
+
+## Entra Setup
+
+To configure the Microsoft Entra integration, follow these steps to create an App Registration in your Azure console.
+
+To add an app registration to your tenant:
+
+1. Sign in to the [Microsoft Entra admin center](https://entra.microsoft.com/) as at least a [Cloud Application Administrator](https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/permissions-reference#cloud-application-administrator).
+2. Browse to Identity > Applications > App Registrations.
+3. Select New registration.
+4. Enter a name e.g 'Common Fate'
+5. For Supported account types, select Accounts in this organizational directory only (should be selected by default).
+6. Click **Register**
+
+You will now be on the app registration overview page.
+
+1. Browse to API permissions
+2. Under Configured permissions, select **Microsoft Graph**
+3. Select the following permissions **Group.Read.All, User.Read.All, GroupMember.ReadWrite.All**
+4. Remove the permission **User.Read**
+5. Click **Update permissions**
+
+You will now create a client secret.
+
+1. Browse to Certificates & secrets > Client secrets
+2. Click **New client secret**
+3. Give it an optional description and configure the expiry as required. Be sure to set a reminder to renew the secret before it expires.
+4. Click **Add**
+
+You will need to create a new `SecretString` in SSM Parameter Store and then use the path when configuring your deployment in Terraform.
+
+You can use the AWS CLI to create a secret in the region you are deploying to. you must use the following path `"/<namespace>/<stage>/<secret name>"`.
+
+```bash
+aws ssm put-parameter \
+    --name "/common-fate/prod/entra-client-secret" \
+    --value "mySecretValue" \
+    --type "SecureString"
+```
+
+## Configuring Common Fate
+
+In this section, you will register the Entra integration with your Common Fate deployment. At the end of this section you should have Common Fate ready to provision access. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).
+
+Navigate to the overview page of your app registration, find the client id **(Application (client) ID)** and the tenant id **(Directory (tenant) ID)**
+
+Inside your Application Configuration repository, add the following module:
+
+```hcl
+resource "commonfate_entra_integration" "entra" {
+  name                      = "Entra"
+  tenant_id                 = "<Your Entra tenant id>"
+  client_id                 = "<Your Entra client id>"
+  client_secret_secret_path = "/common-fate/prod/entra-client-secret"
+}
+```
+
+Apply the changes. If the apply succeeds, you should see the integration appear on the settings page in the web dashboard.
+
+<Aside>
+  Dynamic Groups in Entra are not fully supported by Common Fate. You may see these groups appear in the Directory in Common Fate however they may not show the Correct members as seen in the Entra Console and should not be relied on when authoring Access Policies.
+</Aside>
+
+## Provisioning access to Entra Groups
+
+You can now create an access workflow and availabilities:
+
+```hcl
+resource "commonfate_access_workflow" "entra" {
+  name                     = "entra"
+  access_duration_seconds  = 60 * 60 * 2
+  priority                 = 1
+}
+
+resource "commonfate_entra_group_selector" "select_all" {
+  id        = "example"
+  name      = "Example"
+  tenant_id = "abcd-1234-abcd-1234"
+  when      = "true"
+}
+
+
+resource "commonfate_entra_group_availabilities" "demo" {
+  workflow_id             = commonfate_access_workflow.entra.id
+  entra_group_selector_id = commonfate_entra_group_selector.select_all.id
+  tenant_id               = "<Your Entra tenant id>"
+}
+
+```
+
+## Entra group selectors
+
+To make Entra groups available for Just-In-Time (JIT) access you can add a `commonfate_entra_group_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_entra_group_selector` in conjunction with a `commonfate_entra_group_availabilities` and `commonfate_access_workflow` resources, as shown above.
+
+We've included some examples below.
+
+### Select a group by ID
+
+```hcl
+resource "commonfate_entra_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  tenant_id = "abcd-1234-abcd-1234"
+  when                = <<EOT
+  resource == Entra::Group::"abcd-1234-abcd-1234"
+  EOT
+}
+```
+
+### Select multiple groups by ID
+
+```hcl
+resource "commonfate_entra_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  tenant_id = "abcd-1234-abcd-1234"
+  when                = <<EOT
+  resource == Entra::Group::"abcd-1234-abcd-1234" || resource == Entra::Group::"efgh-5678-efgh-5678"
+  EOT
+}
+```
+
+### Select a group based on a naming pattern
+
+Select groups with a name ending in `-prod`:
+
+```hcl
+resource "commonfate_entra_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  tenant_id = "abcd-1234-abcd-1234"
+  when                = <<EOT
+  resource.name like "*-prod"
+  EOT
+}
+```
+
+Select groups with a name beginning with `Develop`:
+
+```hcl
+resource "commonfate_entra_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  tenant_id = "abcd-1234-abcd-1234"
+  when                = <<EOT
+  resource.name like "Develop*"
+  EOT
+}
+```

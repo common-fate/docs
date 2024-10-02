@@ -1,0 +1,27 @@
+---
+title: "Selectors"
+description: "This explains how to make Selectors to be used in Common Fate."
+---
+
+## What are Selectors?
+
+Selectors are used in Common Fate to inform the policy engine what **targets** should be selected for access. A Target is the resource an [entitlement](/setup/glossary#entitlement) grants access to, such as an AWS Account or GCP Project.
+
+## Creating a Selector
+
+There are selectors for each of the supported resources in Common Fate.
+
+Below is an example of a GCP Selector:
+
+```hcl workflow.tf
+resource "commonfate_gcp_project_selector" "selector-demo" {
+  id = "demo"
+  name = "demo"
+  gcp_organization_id = "organization/29384625153"
+  when = <<EOT
+  resource.tag_keys contains "production" && resource in GCP::Folder::"folders/342982723"
+  EOT
+}
+```
+
+In the example this selector will match any GCP projects that have `resource.tag_keys` with "production" in the name and any projects within the "folders/342982723" folder.

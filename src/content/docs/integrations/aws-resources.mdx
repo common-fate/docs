@@ -1,0 +1,176 @@
+---
+title: "AWS Resources"
+description: "Setup guide for the Common Fate AWS Resources integration."
+---
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This guide will walk you through integrating Common Fate with Amazon Web Services (AWS) for access to specific resources like S3 Buckets. By the end of this guide, you'll have a functioning integration with Common Fate, allowing it to read your AWS resources and provision access to entitlements.
+
+## AWS Setup
+
+Common Fate uses the managed policy SecurityAudit to read metadata about reasources in your AWS accounts. You can deploy a terraform module that will roll out a CloudFormation StackSet to a set of accounts in your organization.
+Alternatively you can deploy a role manually in each account that you wish to read resources from.
+
+You'll need access to a role with the ability to create IAM roles and policies in your AWS account.
+
+<Tabs>
+  <TabItem label="Using Terraform">
+    We have developed a [reference integration Terraform module](https://github.com/common-fate/terraform-aws-common-fate-deployment/tree/main/modules/aws-idc-integration/audit-roles)
+    which deploys the following resources:
+
+- A StackSet which creates an IAM Role with SecurityAudit policy in accounts within the selected Organizational Units
+
+<Aside>
+  This Terraform module requires sensitive AWS account-level permissions.
+  Deploying this module in a separate Terraform root module is recommended to
+  avoid combining privileged access to both your Common Fate deployment and your
+  AWS account.
+</Aside>
+
+To deploy the reference integration, create a new Terraform root module with the following module:
+
+```hcl
+
+module "common-fate-aws-audit-roles" {
+  source                     = "common-fate/common-fate-deployment/aws//modules/aws-idc-integration/audit-roles"
+  version                    = "2.2.0"
+  common_fate_aws_account_id = "<The AWS Account ID containing your Common Fate deployment>"
+  organizational_unit_ids    = [<A list of org unit ids>] // You can use the root OU here to deploy the role into all accounts
+}
+
+output "audit_role_name" {
+  value = module.common-fate-aws-audit-roles.audit_role_name
+}
+
+```
+
+  </TabItem>
+
+  <TabItem label="Using the AWS Management Console">
+
+1. Open the AWS Console in an account you wish to scan for resources.
+
+2. Navigate to IAM and click on "Roles" in the left navigation pane.
+
+3. Create a role named "common-fate-audit" this is the default, you can use a different name if you like and specify it in the later steps.
+
+4. Attach the SecurityAudit managed policy.
+
+5. Configure the trust policy of the read role to allow the Common Fate Deployment account to assume it.
+
+6. Optionally add an external ID condition.
+
+  </TabItem>
+
+</Tabs>
+
+## Configuring Common Fate
+
+In this section, you will register the AWS integration with your Common Fate deployment. At the end of this section, you should have Common Fate reading AWS resources and see them inside the web dashboard. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).
+
+Inside your Application Configuration repository, add the following module:
+
+```hcl
+
+resource "commonfate_aws_resource_scanner" "dev" {
+  integration_id = <The ID of your AWS IDC integration>
+  regions        = ["ap-southeast-2", "us-west-2"] // A list of regions to scan for resources
+  filter_for_account_ids = ["385788203919", "382163615164"] // optional list of account IDs to scan for resources
+  role_name = "common-fate-aws-integration-internal-prod-audit-role" // optional role name, if you deployed the role manually, add the role name here
+}
+
+```
+
+Apply the changes. If the apply succeeds AWS resources should populate within 10 minutes.
+
+If after 10 minutes you do not see resources appear, check the logs of the `common-fate-prod-worker` service in ECS. You can search for `aws_global_resource_sync` to filter for structured logs containing data about the AWS Resources integration.
+
+## Provisioning access to AWS Resources
+
+You can now create an access workflow and availabilities:
+
+```hcl
+# config/aws_idc.tf, see: https://github.com/common-fate/byoc-aws-starter-config/tree/main/config
+
+resource "commonfate_access_workflow" "aws" {
+  name                     = "aws"
+  access_duration_seconds  = 60 * 60 * 2
+  priority                 = 1
+}
+
+resource "commonfate_selector" "aws_resources" {
+  id = "aws_resources"
+  belonging_to = {
+    type = "AWS::Organization"
+    id   = "<Your AWS Organization ID>"
+  }
+  resource_type = "AWS::Resource"
+  when          = "true"
+}
+
+resource "commonfate_availability_spec" "aws_resources" {
+  workflow_id = commonfate_access_workflow.aws.id
+  role = {
+    type = "Access::Role"
+    id   = "Reader"
+  }
+  target = {
+    type = "Access::Selector"
+    id   = "aws_resources"
+  }
+  identity_domain = {
+    id   = <Your Identity Store ID>"
+    type = "AWS::IDC::IdentityStore"
+  }
+}
+
+
+```
+
+# Built-in Roles for AWS Resource Access
+
+Common Fate provides 4 built-in role for use when accessing AWS Resources.
+
+- Access::Role::"MetadataViewer"
+- Access::Role::"Reader"
+- Access::Role::"Editor"
+- Access::Role::"Owner"
+
+When a user requests access to resources within the same AWS Account, a single PermissionSet is created or updated with the required IAM policies to grant access to all their requested resources.
+Users can access this role via the Common Fate web console by visiting their request. The web console also has instructions to access the role via Granted CLI.
+
+# Cedar policies
+
+### Permit Access::Role::"Reader" access to S3 Buckets in a specific OU
+
+```
+permit (
+    principal,
+    action == Access::Action::"Request",
+    resource is AWS::ResourceEntitlement
+)
+when
+{
+// S3 buckets in the ou-123 org unit
+resource.type == "AWS::S3::Bucket" &&
+resource in AWS::OrgUnit::"ou-123" &&
+    // Read-only role
+    resource.role == Access::Role::"Reader"
+};
+
+@advice("read only resource access is automatically approved")
+permit (
+    principal,
+    action == Access::Action::"Activate",
+    resource is AWS::ResourceGrant
+)
+when
+{
+// S3 buckets in the ou-123 org unit
+resource.type == "AWS::S3::Bucket" &&
+resource in AWS::OrgUnit::"ou-123" &&
+    // Read-only role
+    resource.role == Access::Role::"Reader"
+};
+
+```

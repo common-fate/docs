@@ -1,0 +1,234 @@
+---
+title: "Getting Started"
+description: "This guide will get you started using Granted to assume roles in AWS. It will take around 5 minutes to complete."
+banner:
+  content: |
+    Get audited access to RDS databases without a VPN using the Granted RDS Plugin.
+    <a href="/granted-rds">Learn more here</a>.
+---
+
+import { YouTube } from '@astro-community/astro-embed-youtube';
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+![CLI screenshot](./images/cli-screenshot.png)
+
+## Install the AWS CLI
+
+Although Granted doesn't depend on the AWS CLI, we recommend [installing it](https://docs.aws.amazon.com/cli/latest/userguide/deploying-granted-install.html) in order to run a test command to verify Granted is working properly.
+
+## Video Walkthrough
+
+If you'd prefer to watch a video tutorial, Rowan from Common Fate has recorded an introduction to Granted on our Youtube channel.
+
+<YouTube id="https://youtu.be/pKb9FIl-VGk" />
+
+## Set up your AWS profile file
+
+You will also need to set up at least one role in your [AWS config file](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-files.html). On MacOS and Linux, this is stored in `~/.aws/config`. On Windows, this is stored in the `%UserProfile%` directory. Some example configurations are included below.
+
+If you use AWS SSO but you haven't yet configured any profiles, you can run `aws configure sso` which will walk you through the process of setting up your profile file.
+
+**If you've already set up roles for the AWS CLI to access AWS you probably don't need to configure anything: Granted uses the same configuration files as the AWS CLI.**
+
+```
+# ~/.aws/config
+# Change the values below to match your AWS SSO configuration
+# Granted uses the profile name: in this case 'my-profile' to choose the role.
+
+[profile my-profile]
+sso_start_url=https://mycompany.awsapps.com/start
+sso_region=us-east-1
+sso_account_id=123456789012
+sso_role_name=DeveloperRole
+region=us-east-1
+```
+
+More information on using IAM users and roles can be found [here](https://blog.coinbase.com/you-need-more-than-one-aws-account-aws-bastions-and-assume-role-23946c6dfde3).
+
+```
+# ~/.aws/credentials
+[base]
+aws_access_key_id=<ACCESS_KEY>
+aws_secret_access_key=<SECRET_KEY>
+```
+
+```
+# ~/.aws/config
+# Change the values below to match your AWS role configuration
+# Granted uses the profile name: in this case 'my-profile' to choose the role.
+
+[profile base]
+region=us-east-1
+
+[profile my-profile]
+region=us-east-1
+source_profile=base
+role_arn=arn:aws:iam::123456789012:role/my-role
+```
+
+## Installing the CLI
+
+In order to use Granted you'll need to install it on your system. Common Fate provides binaries for Granted.
+
+<Tabs>
+  <TabItem label="MacOS">
+    ### Using Homebrew
+    [Homebrew](https://brew.sh/) is an open source package manager for MacOS. We publish a Homebrew formula for Granted. To install Granted with Homebrew, run the commands below in your terminal.
+
+    ```bash
+    brew tap common-fate/granted
+    brew install granted
+    ```
+    ### Manual install
+    Select the steps which match your system architecture. You can find your architecture by running `uname -m` from a terminal window.
+
+    #### For Intel (x86_64 architecture):
+
+    ```bash
+    curl -OL https://releases.commonfate.io/granted/v0.31.0/granted_0.31.0_darwin_x86_64.tar.gz
+    sudo tar -zxvf ./granted_0.31.0_darwin_x86_64.tar.gz -C /usr/local/bin/
+    ln -s /usr/local/bin/granted /usr/local/bin/assumego
+    ```
+
+    #### For ARM (arm64 architecture):
+
+    ```bash
+    curl -OL https://releases.commonfate.io/granted/v0.31.0/granted_0.31.0_darwin_arm64.tar.gz
+    sudo tar -zxvf ./granted_0.31.0_darwin_arm64.tar.gz -C /usr/local/bin/
+    ln -s /usr/local/bin/granted /usr/local/bin/assumego
+    ```
+
+    ## Reverting to an older version of Granted
+
+    If you need to revert to an older version of Granted, you can manually downgrade using the following steps. First, make sure to uninstall your current version of granted. Replace "0.31.0" with the specific version you want to install.
+
+    #### Using Homebrew
+    ```
+    brew uninstall granted
+    brew tap-new $USER/local-tap
+    brew extract --version=0.31.0 common-fate/granted/granted $USER/local-tap
+    brew install granted@0.31.0
+    ```
+
+    #### For Intel (x86_64 architecture):
+
+    ```bash
+    curl -OL https://releases.commonfate.io/granted/v0.31.0/granted_0.31.0_darwin_x86_64.tar.gz
+    sudo tar -zxvf ./granted_0.31.0_darwin_x86_64.tar.gz -C /usr/local/bin/
+    ln -s /usr/local/bin/granted /usr/local/bin/assumego
+    ```
+
+    #### For ARM (arm64 architecture):
+
+    ```bash
+    curl -OL https://releases.commonfate.io/granted/v0.31.0/granted_0.31.0_darwin_arm64.tar.gz
+    sudo tar -zxvf ./granted_0.31.0_darwin_arm64.tar.gz -C /usr/local/bin/
+    ln -s /usr/local/bin/granted /usr/local/bin/assumego
+    ```
+
+    The assumego path is symlinked to granted so that they can both share keychain items without additional prompts. The homebrew install does this automatically but for a manual install on MacOS you’ll need to do it yourself.
+
+  </TabItem>
+  <TabItem label="Linux (APT)">
+
+  Download the latest Granted release using APT by following the steps below. Our Linux releases are [signed with a separate GPG key to our binary files](/granted/security#linux-package-checksum-verification).
+
+  ```bash
+  # install GPG
+  sudo apt update && sudo apt install gpg
+
+  # download the Common Fate Linux GPG key
+  wget -O- https://apt.releases.commonfate.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/common-fate-linux.gpg
+
+  # you can check the fingerprint of the key by running
+  # gpg --no-default-keyring --keyring /usr/share/keyrings/common-fate-linux.gpg --fingerprint
+  # the fingerprint of our Linux Releases key is 783A 4D1A 3057 4D2A BED0 49DD DE9D 631D 2D1D C944
+
+  # add the Common Fate APT repository
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/common-fate-linux.gpg] https://apt.releases.commonfate.io stable main" | sudo tee /etc/apt/sources.list.d/common-fate.list
+
+  # update your repositories
+  sudo apt update
+
+  # install Granted
+  sudo apt install granted
+  ```
+  </TabItem>
+
+  <TabItem label="Linux (Manual)">
+    Select the steps which match your system architecture. You can find your architecture by running `uname -m` from a terminal window.
+
+    <Tabs
+      groupId="linux-arch"
+      defaultValue="x86_64"
+      values={[
+        { label: "x86_64", value: "x86_64" },
+        { label: "arm64", value: "arm64" },
+        { label: "i386", value: "i386" },
+      ]}
+    >
+
+      <TabItem label="x86_64">
+
+        ```bash
+        curl -OL releases.commonfate.io/granted/v0.31.0/granted_0.31.0_linux_x86_64.tar.gz
+        sudo tar -zxvf ./granted_0.31.0_linux_x86_64.tar.gz -C /usr/local/bin/
+        ```
+
+      </TabItem>
+      <TabItem label="arm64">
+
+        ```bash
+        curl -OL releases.commonfate.io/granted/v0.31.0/granted_0.31.0_linux_arm64.tar.gz
+        sudo tar -zxvf ./granted_0.31.0_linux_arm64.tar.gz -C /usr/local/bin/
+        ```
+
+      </TabItem>
+      <TabItem label="i386">
+
+        ```bash
+        curl -OL releases.commonfate.io/granted/v0.31.0/granted_0.31.0_linux_i386.tar.gz
+        sudo tar -zxvf ./granted_0.31.0_linux_i386.tar.gz -C /usr/local/bin/
+        ```
+
+      </TabItem>
+    </Tabs>
+
+  </TabItem>
+  <TabItem label="Windows">
+    First, download the zip archive of Granted which matches your system's architecture. You can find your architecture by viewing your system properties in the Control Panel.
+
+    [Granted for Windows x86_64](https://releases.commonfate.io/granted/v0.31.0/granted_0.31.0_windows_x86_64.zip)
+
+    [Granted for Windows arm64](https://releases.commonfate.io/granted/v0.31.0/granted_0.31.0_windows_arm64.zip)
+
+    [Granted for Windows i386](https://releases.commonfate.io/granted/v0.31.0/granted_0.31.0_windows_i386.zip)
+
+    After downloading Granted, unzip the package. Granted runs as two binaries, `assume` and `granted`. Any other files in the package can be removed, and Granted will still function.
+
+    You'll need to move Granted to a folder that is accessible on your `PATH`. [This StackOverflow link](https://stackoverflow.com/questions/1618280/where-can-i-set-path-to-make-exe-on-windows) has instructions on how to do this.
+
+    If you are using Granted with the [Git Bash shell on Windows](https://gitforwindows.org), we recommend enabling experimental support for pseudo consoles. You may need to reinstall Git For Windows to enable this. You can read more about this [here](https://github.com/cli/cli/issues/404).
+
+    ![Git Bash pseudo console screenshot](./images/git-bash-pseudo-console.png)
+
+  </TabItem>
+</Tabs>
+
+## Verify the installation
+
+You can verify the integrity and authenticity of the Granted binary you have downloaded by running through the [verification process here](/granted/security#release-verification).
+
+To verify that the installation has succeeded, print the version of Granted by running `granted -v`. You should see an output similar to below.
+
+```
+➜ granted -v
+
+Granted v0.31.0
+```
+
+If you have any issues installing don't hesitate to [ask for help on our Slack](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg).
+
+## Next steps
+
+Now that you've installed Granted, it's time to [assume your first role](/granted/usage/assuming-roles).

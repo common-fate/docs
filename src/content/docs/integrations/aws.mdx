@@ -1,0 +1,419 @@
+---
+title: "AWS"
+description: "Setup guide for the Common Fate AWS integration."
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+This guide will walk you through integrating Common Fate with Amazon Web Services (AWS). By the end of this guide, you'll have a functioning integration with Common Fate, allowing it to read your AWS account inventory and provision access to entitlements.
+
+## AWS Setup
+
+By default, two IAM roles are used—one for reading available entitlements and another for assigning access. Although you can combine these into a single role, it is recommended to use two separate roles for better visibility.
+
+You'll need access to a role with the ability to create IAM roles and policies in your AWS account.
+
+The permissions that the read role uses are:
+
+- iam:GetRole
+- iam:GetSAMLProvider
+- iam:ListAttachedRolePolicies
+- iam:ListRolePolicies
+- identitystore:ListUsers
+- identitystore:ListGroups
+- identitystore:ListGroupMemberships
+- organizations:DescribeAccount
+- organizations:DescribeOrganization
+- organizations:ListAccounts
+- organizations:ListAccountsForParent
+- organizations:ListOrganizationalUnitsForParent
+- organizations:ListRoots
+- organizations:ListTagsForResource
+- sso:DescribePermissionSet
+- sso:ListAccountAssignments
+- sso:ListPermissionSets
+- sso:ListTagsForResource
+
+The permissions that the provision role uses are:
+
+- sso:CreateAccountAssignment
+- sso:DeleteAccountAssignment
+- sso:DescribeAccountAssignmentCreationStatus
+- sso:DescribeAccountAssignmentDeletionStatus
+
+Additionally, if you choose to allow Common Fate to manage access to your AWS Organizations Management Account, the following permissions are added:
+
+- iam:CreateRole
+- iam:AttachRolePolicy
+
+<Tabs>
+  <TabItem label="Using Terraform">
+    We have developed a [reference integration Terraform module](https://github.com/common-fate/terraform-aws-common-fate-deployment/tree/main/modules/aws-idc-integration/iam-roles)
+    which deploys the following resources:
+
+- A role used by Common Fate to read AWS IDC resources
+- A role used by Common Fate to provision access in AWS IDC
+
+<Aside>
+  This Terraform module requires sensitive AWS account-level permissions.
+  Deploying this module in a separate Terraform root module is recommended to
+  avoid combining privileged access to both your Common Fate deployment and your
+  AWS account.
+</Aside>
+
+To deploy the reference integration, create a new Terraform root module with the following module:
+
+```hcl
+module "common_fate_aws_roles" {
+  source                                = "common-fate/common-fate-deployment/aws//modules/aws-idc-integration/iam-roles"
+  version                               = "1.22.0"
+  common_fate_aws_account_id            = "<Common Fate AWS Account ID>"
+}
+```
+
+  </TabItem>
+
+  <TabItem label="Using the AWS Management Console">
+
+1. Open the AWS Console in your organization's management account.
+
+2. Navigate to IAM and click on "Policies" in the left navigation pane.
+
+3. Click the "Create Policies" button to create the following policies. We recommend naming them "[namespace]-[stage]-idc-read" and "[namespace]-[stage]-idc-provision."
+
+   **Read Policy:**
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "ReadIDC",
+         "Effect": "Allow",
+         "Action": [
+           "iam:GetRole",
+           "iam:GetSAMLProvider",
+           "iam:ListAttachedRolePolicies",
+           "iam:ListRolePolicies",
+           "identitystore:ListUsers",
+           "identitystore:ListGroups",
+           "identitystore:ListGroupMemberships",
+           "organizations:DescribeAccount",
+           "organizations:DescribeOrganization",
+           "organizations:ListAccounts",
+           "organizations:ListAccountsForParent",
+           "organizations:ListOrganizationalUnitsForParent",
+           "organizations:ListRoots",
+           "organizations:ListTagsForResource",
+           "sso:DescribePermissionSet",
+           "sso:ListAccountAssignments",
+           "sso:ListPermissionSets",
+           "sso:ListTagsForResource"
+         ],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
+
+   **Provision Policy:**
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Sid": "AssignIDC",
+         "Effect": "Allow",
+         "Action": [
+           "sso:CreateAccountAssignment",
+           "sso:DeleteAccountAssignment",
+           "sso:DescribeAccountAssignmentCreationStatus",
+           "sso:DescribeAccountAssignmentDeletionStatus"
+         ],
+         "Resource": "*"
+       }
+     ]
+   }
+   ```
+
+   **[Optional] Assign Management Account IDC Policy:**
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+        "Sid" : "IAMSAMLProviderUpdateAction",
+        "Effect" : "Allow",
+        "Action" : [
+          "iam:UpdateSAMLProvider"
+        ],
+        "Resource" : [
+          "arn:aws:iam::*:saml-provider/AWSSSO_*"
+        ]
+      },
+      {
+        "Sid" : "IAMSAMLProviderCleanupActions",
+        "Effect" : "Allow",
+        "Action" : [
+          # "iam:DeleteSAMLProvider", - removed here out of an abundance of caution, shouldn't be required for provisioning JIT access to the management account.
+          "iam:GetSAMLProvider"
+        ],
+        "Resource" : [
+          "arn:aws:iam::*:saml-provider/AWSSSO_*"
+        ]
+      },
+      {
+        "Sid" : "IAMRoleCleanupActions",
+        "Effect" : "Allow",
+        "Action" : [
+          "iam:DeleteRole",
+          "iam:DeleteRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies"
+        ],
+        "Resource" : [
+          "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*"
+        ]
+      },
+      {
+        "Sid" : "AssignManagementAccountIDC",
+        "Effect" : "Allow",
+        "Action" : [
+          "iam:AttachRolePolicy",
+          "iam:CreateRole",
+          "iam:PutRolePolicy",
+          "iam:UpdateRole",
+          "iam:UpdateRoleDescription",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:PutRolePermissionsBoundary",
+          "iam:DeleteRolePermissionsBoundary"
+        ],
+        "Resource" : "arn:aws:iam::*:role/aws-reserved/sso.amazonaws.com/*",
+        "Condition" : {
+          "StringEquals" : {
+            "aws:PrincipalOrgMasterAccountId" : "${aws:PrincipalAccount}"
+          }
+        }
+      }
+     ]
+   }
+   ```
+
+4. Create roles named "[namespace]-[stage]-idc-reader-role" and "[namespace]-[stage]-idc-provisioner-role."
+
+5. Attach the respective policies to the roles created in the previous step.
+
+6. Configure the trust policy of the read role to allow the control plane task role to assume it.
+
+7. Configure the trust policy of the provision role to allow the provisioner task role to assume it.
+
+8. For the read role add a tag with key `common-fate-aws-integration-read-role` and value `true` and for the provision role add a tag with key `common-fate-aws-integration-provision-role`and value `true`.
+
+</TabItem>
+
+</Tabs>
+
+## Configuring Common Fate
+
+In this section, you will register the AWS integration with your Common Fate deployment. At the end of this section, you should have Common Fate reading AWS resources and see them inside the web dashboard. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).
+
+Inside your Application Configuration repository, add the following module:
+
+```hcl
+# config/main.tf (in the Config folder, see: https://github.com/common-fate/byoc-aws-starter-config/tree/main/config)
+
+resource "commonfate_aws_idc_integration" "sandbox" {
+  name                   = "AWS"
+  reader_role_arn        = "<ARN of the idc-reader-role>"
+  provisioner_role_arn   = "<ARN of the idc-provisioner-role>"
+  sso_instance_arn       = "<The AWS SSO Instance ARN>"
+  sso_region             = "<The region the AWS SSO instance is deployed to>"
+  identity_store_id      = "<AWS identity store ID>"
+}
+```
+
+Apply the changes. If the apply succeeds, you should see the integration appear on the settings page in the web dashboard, and AWS resources should populate within 10 minutes.
+
+If after 10 minutes you do not see resources appear, check the logs of the `common-fate-prod-control-plane` service in ECS. You can search for `aws_sync` to filter for structured logs containing data about the AWS integration.
+
+## Provisioning access to AWS
+
+You can now create an access workflow and availabilities:
+
+```hcl
+# config/aws_idc.tf, see: https://github.com/common-fate/byoc-aws-starter-config/tree/main/config
+
+resource "commonfate_access_workflow" "aws" {
+  name                     = "aws"
+  access_duration_seconds  = 60 * 60 * 2
+  priority                 = 1
+}
+
+resource "commonfate_aws_account_selector" "select_all" {
+  id                  = "select_all_aws"
+  name                = "Select All AWS"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = "true"
+}
+
+resource "commonfate_aws_idc_account_availabilities" "aws" {
+  workflow_id             = commonfate_access_workflow.aws.id
+  aws_permission_set_arn  = <The permission set ARN to grant access to>
+  aws_account_selector_id = commonfate_aws_account_selector.select_all.id
+  aws_identity_store_id   = "<Your Identity Store ID>"
+
+}
+```
+
+## AWS account selectors
+
+To make AWS accounts available for Just-In-Time (JIT) access you can add a `commonfate_aws_account_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_aws_account_selector` in conjunction with a `commonfate_aws_idc_account_availabilities` and `commonfate_access_workflow` resources, as shown above.
+
+We've included some examples below.
+
+### Select an account by ID
+
+```hcl
+resource "commonfate_aws_account_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = <<EOT
+  resource == AWS::Account::"123456789012"
+  EOT
+}
+```
+
+### Select multiple accounts by ID
+
+```hcl
+resource "commonfate_aws_account_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = <<EOT
+  resource == AWS::Account::"123456789012"  || resource == AWS::Account::"222333444555"
+  EOT
+}
+```
+
+### Select an account based on a naming pattern
+
+Select accounts with a name ending in `-prod`:
+
+```hcl
+resource "commonfate_aws_account_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = <<EOT
+  resource.name like "*-prod"
+  EOT
+}
+```
+
+Select accounts with a name beginning with `Develop`:
+
+```hcl
+resource "commonfate_aws_account_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = <<EOT
+  resource.name like "Develop*"
+  EOT
+}
+```
+
+### Select accounts belonging to a particular Organizational Unit (OU)
+
+```hcl
+resource "commonfate_aws_account_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = <<EOT
+  resource in AWS::OrgUnit::"ou-123abc"
+  EOT
+}
+```
+
+### Select an account containing a tag key
+
+Selects AWS accounts which have a tag with a key of `production`:
+
+```hcl
+resource "commonfate_aws_account_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = <<EOT
+  resource.tag_keys.contains("production")
+  EOT
+}
+```
+
+### Select an account containing a tag key and value
+
+Selects AWS accounts which have a tag with key `department` and value `engineering` (`department=engineering`):
+
+```hcl
+resource "commonfate_aws_account_selector" "example" {
+  id                  = "example"
+  name                = "Example"
+  aws_organization_id = "<Your AWS Organization ID>"
+  when                = <<EOT
+  resource.tags.contains({key: "department", value: "engineering"})
+  EOT
+}
+```
+
+## Minimum IAM permissions to provision the AWS Integration roles
+
+Rather than using an administrative access role to provision the AWS integration roles, you can use the following policy which will permit deploying and updating the integration roles:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowPolicyCreateAndUpdate",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreatePolicy",
+        "iam:GetPolicyVersion",
+        "iam:GetPolicy",
+        "iam:ListPolicyVersions",
+        "iam:CreatePolicyVersion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowRoleUpdate",
+      "Effect": "Allow",
+      "Action": [
+        "iam:ListRolePolicies",
+        "iam:CreateRole",
+        "iam:ListAttachedRolePolicies",
+        "iam:TagRole",
+        "iam:GetRole",
+        "iam:ListInstanceProfilesForRole",
+        "iam:AttachRolePolicy",
+        "iam:UpdateRole",
+        "iam:PutRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:UpdateRoleDescription"
+      ],
+      "Resource": [
+        "arn:aws:iam::<YOUR MANAGEMENT ACCOUNT ID>:role/common-fate-prod-idc-reader-role",
+        "arn:aws:iam::<YOUR MANAGEMENT ACCOUNT ID>:role/common-fate-prod-idc-provisioner-role"
+      ]
+    }
+  ]
+}
+```

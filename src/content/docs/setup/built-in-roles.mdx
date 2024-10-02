@@ -1,0 +1,91 @@
+---
+title: "Administering Common Fate"
+description: "Set up JIT access to built-in roles to administer your Common Fate deployment."
+---
+
+Some features and actions in your Common Fate deployment can only be accessed by a user who has been assigned to the administrator role.
+The administrator role is referred to as a built-in role, and it can be accessed using a JIT assignment in the same way that users request access to other entitlements.
+On new deployments, the built-in roles are ready for use by default to help you get started.
+
+## Built-in roles
+
+| name         | ID                        | access |
+| ------------ | ------------------------- | ------ |
+| Administrator | CF::Role::"administrator" | Manage policies, read deployment secrets, create integrations    |
+
+## Make the Administrator role available for request
+
+The simplest way you make the role available to request is to add the following Cedar policy:
+
+```js
+permit (
+    principal is CF::User,
+    action == Access::Action::"Request",
+    resource is CF::DeploymentEntitlement
+);
+
+permit (
+    principal is CF::User,
+    action == Access::Action::"Activate",
+    resource is CF::DeploymentGrant
+);
+
+permit (
+    principal is CF::User,
+    action == Access::Action::"Close",
+    resource is CF::DeploymentGrant
+);
+```
+
+Users will be able to request access for up to 24 hours by creating a request in the console for the role CF::Role::"administrator" to target CF::Deployment::"common-fate".
+
+## Restricting access to a specific built-in role
+
+You can restrict access to a specific built-in role by adding a `when` clause to your Cedar policy:
+
+```js
+permit (
+    principal is CF::User,
+    action == Access::Action::"Request",
+    resource is CF::DeploymentEntitlement
+) when {resource.role == CF::Role::"administrator"};
+
+permit (
+    principal is CF::User,
+    action == Access::Action::"Activate",
+    resource is CF::DeploymentGrant
+) when {resource.role == CF::Role::"administrator"};
+
+permit (
+    principal is CF::User,
+    action == Access::Action::"Close",
+    resource is CF::DeploymentGrant
+);
+```
+
+## Add slack notifications or restrict the request duration
+
+If you would like to add slack alerts, you can either attach an alert config to the built-in workflow `wrk_builtin_default` or create your own workflow and an availability spec:
+When you use your own workflow, set the priority to 1 or higher.
+
+```hcl
+resource "commonfate_access_workflow" "builtin_roles" {
+  name                     = "built-in roles"
+  access_duration_seconds  = 60 * 60 # 1 hour
+  priority                 = 1
+}
+
+
+resource "commonfate_availability_spec" "builtin_administrator_role" {
+  workflow_id = commonfate_access_workflow.builtin_roles.id
+  role = {
+    type = "CF::Role"
+    id   = "administrator"
+  }
+
+  target = {
+    type = "CF::Deployment"
+    id   = "common-fate"
+  }
+}
+```

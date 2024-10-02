@@ -1,0 +1,557 @@
+---
+title: "Migration Guide"
+description: "This page will detail migration steps to upgrade your deployment of Common Fate to new versions."
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## v2.5.0
+
+In this release, the `aws` provider block has been [removed from the Common Fate Terraform module](https://github.com/common-fate/terraform-aws-common-fate-deployment/pull/316). This change has been made to allow the `aws` provider to be configured _outside_ of the Common Fate module.
+
+We recommend running a `terraform plan` when upgrading to this version to confirm that no unexpected resources will be deleted or recreated.
+
+When updating to this version, please ensure that you have configured an `aws` provider outside of the Common Fate module. For example:
+
+```hcl
+provider "aws" {
+  allowed_account_ids = ["123456789012"]
+  region              = "us-east-1"
+}
+
+module "common-fate" {
+  source  = "common-fate/common-fate-deployment/aws"
+  version = "2.4.2"
+
+  // ... other variables here
+}
+```
+
+If for any reason your Terraform state file is stored in a different AWS region to your Common Fate deployment, you will need to add a provider with an alias. For example:
+
+```hcl
+provider "aws" {
+  allowed_account_ids = ["123456789012"]
+  region              = "us-east-1"
+}
+
+provider "aws" {
+  alias               = "us-west-2"
+  allowed_account_ids = ["123456789012"]
+  region              = "us-west-2"
+}
+
+module "common-fate" {
+  source  = "common-fate/common-fate-deployment/aws"
+  version = "2.4.2"
+
+  region = "us-west-2"
+
+  providers = {
+    aws = aws.us-west-2
+  }
+
+  // ... other variables here
+}
+```
+
+## v2.0.0
+
+The main change in v2.0.0 is the removal of the authz service from the infrastructure, and some configuration variables which have been removed.
+To upgrade your deployment, check the below guide to see if you need to remove any of the variables listed.
+
+### Authz Service Removed
+
+The Authz service has been removed from the infrastructure stack in v2.0.0. This service has been fully replaced and the application is now backed by the Postgres database instead of the DynamoDB table.
+While the authz service has been removed, the Cloudwatch logs and DynamoDB table will be retained for a period of time until they are also removed in the future.
+
+When upgrading to v2.0.0, you should expect to the the infrastructure related to the Authz service removed, including the ECS service, networking, and IAM roles and policies.
+
+### Unstable Feature Least Privileged Analysis Removed
+
+The least privilege analysis feature flag has been removed, if you had the feature enabled, you should remove references to the variables in your infrastructure.
+
+```diff
+- unstable_enable_feature_least_privilege
+- unstable_sync_idc_cloudtrail_schedule
+- unstable_least_privilege_analysis_schedule
+```
+
+### Branding Customization Removed
+
+Branding customization support has been removed from the app, you should remove references to the variables in your infrastructure.
+
+```diff
+- team_name
+- logo_url
+```
+
+### Provisioner Configuration Variable Blocks Removed
+
+The provisioner configuration was previously deprecated and is now sourced from the integration resources in the application config. You should remove references to the variables in your infrastructure.
+
+```diff
+- provisioner_aws_idc_config
+- provisioner_gcp_config
+- provisioner_entra_config
+- provisioner_aws_rds_config
+- provisioner_okta_config
+- provisioner_datastax_config
+- provisioner_auth0_config
+```
+
+### Slack and Pager Duty Configuration Variables Removed
+The Slack and PagerDuty configuration was previously deprecated and is now sourced from the integration resources in the application config. You should remove references to the variables in your infrastructure.
+
+```diff
+- pager_duty_client_id
+- pager_duty_client_secret_ps_arn
+- slack_client_id
+- slack_client_secret_ps_arn
+- slack_signing_secret_ps_arn
+```
+
+## v1.45.0
+
+#### Prerequisites
+
+- terraform-provider-commonfate v2.19.0
+- Common Fate deployment v1.44.1
+
+### Configuring provisioners via the infrastructure has been deprecated
+
+v1.45.0 removes the requirement to specify the provisioner configuration in the infrastructure, this configuration is not sourced directly from the integrations in the application configuration.
+
+Before updating to v1.45.0, if you use the AWS IDC or GCP integrations, you need to update your application configuration.
+
+First, ensure that you have upgraded your deployment to v1.44.1. Then, follow the steps below.
+
+#### AWS IDC
+
+For AWS copy the `role_arn` from your infrastructure config block and add it your commonfate_aws_idc_integration
+
+```hcl
+  provisioner_aws_idc_config = {
+    idc_instance_arn      = local.sso_instance_arn
+    idc_region            = local.sso_region
+    role_arn              = "arn:aws:iam::12345678912:role/common-fate-prod-idc-provisioner-role"
+    idc_identity_store_id = local.identity_store_id
+  }
+```
+
+```diff
+resource "commonfate_aws_idc_integration" "sandbox" {
+  name                 = "Example"
++ provisioner_role_arn     = "arn:aws:iam::12345678912:role/common-fate-prod-idc-provisioner-role"
+}
+```
+
+#### GCP
+
+For GCP copy the `workload_identity_config_json` from your infrastructure config block and add it your commonfate_gcp_integration
+
+```hcl
+  provisioner_gcp_config = {
+    workload_identity_config_json = <<EOH
+      {...}
+    EOH
+  }
+```
+
+```diff
+resource "commonfate_gcp_integration" "sandbox" {
+  name                 = "Example"
++ provisioner_workload_identity_config = <<EOH
++     {...}
++   EOH
+}
+```
+
+Once you have deployed your configuration you will be able to upgrade to v1.45.0
+You may leave the infrastructure provider configuration blocks unchanged incase you need to rollback your deployment.
+Once you have confirmed your deployment is working as expected, the provisioner configuration blocks can be safely removed from your infrastucture.
+
+
+## v1.44.0
+
+### Slack and PagerDuty infrastructure configuration has been deprecated
+v1.44.0 removes the requirement to configure Slack and PagerDuty in both your application configuration and infrastructure configuration.
+After upgrading to v1.44.0 you can remove the additional variables from your `common-fate` module.
+
+```diff
+module "common-fate" {
+  source = "common-fate/common-fate-deployment/aws"
+  version = "1.44.0"
+
+- pager_duty_client_id  = <pager duty client id>
+- pager_duty_client_secret_ps_arn = <pager duty client secret parameter store ARN>
+- slack_client_id = <slack client id>
+- slack_client_secret_ps_arn  = <slack client secret parameter store ARN>
+- slack_signing_secret_ps_arn = <slack signing secret parameter store ARN>
+}
+```
+
+
+## v1.41.2
+
+### Updating AWS SSO SAML Attribute mappings
+
+1. Head into your management account where you set up the SAML SSO instance.
+
+Click the **Actions** menu then select the **Edit attribute mappings** option.
+
+Leave the email mapping as is. Add the following attribute mappings:
+
+**1. Given Name Mapping**
+
+- For **User attribute in the application**, enter: `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname`
+- For **Maps to this string value or user attribute in IAM Identity Center**, enter: `${user:givenName}`
+- For Format select `basic`
+
+**2. Family Name Mapping**
+
+- For **User attribute in the application**, enter: `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/familyname`
+- For **Maps to this string value or user attribute in IAM Identity Center**, enter: `${user:familyName}`
+- For Format select `basic`
+
+It should look like this:
+
+![Attribute Mapping Example](/images/integrations/attribute-mapping.png)
+
+Click **Save Changes**
+
+### Upgrade your deployment
+
+- Upgrade your deployment to v1.41.2 which will apply the updated attribute mappings to your deployment instance.
+
+## v1.19.0
+
+### Common Fate Slack Integration: Slack based access request workflow
+
+v1.19.0 adds support for a slack based access request workflow. This new feature requires an update to your app manifest in Slack.
+
+To upgrade, follow the steps below:
+
+1. Navigate to https://api.slack.com/apps and then select your Slack app from the list
+2. Select **App Manifest** from the left navigation
+3. Update the manifest JSON with the below, replacing `<Your app url>` where needed with your app URL.
+
+```json
+{
+  "display_information": {
+    "name": "Common Fate",
+    "description": "Common Fate powers your cloud access workflows",
+    "background_color": "#26223a"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Common Fate",
+      "always_online": false
+    },
+    "slash_commands": [
+      {
+        "command": "/access",
+        "url": "<Your app url>/api/v1/integrations/slack/access-command",
+        "description": "Common Fate Access Workflow",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "redirect_urls": ["<Your app url>/api/v1/oauth2/callback/slack"],
+    "scopes": {
+      "bot": [
+        "channels:read",
+        "users:read",
+        "users:read.email",
+        "chat:write",
+        "chat:write.public",
+        "groups:read",
+        "groups:write",
+        "im:read",
+        "im:write",
+        "mpim:read",
+        "mpim:write",
+        "commands"
+      ]
+    }
+  },
+  "settings": {
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "<Your app url>/api/v1/integrations/slack/interactivity",
+      "message_menu_options_url": "<Your app url>/api/v1/integrations/slack/options-load"
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
+```
+
+4. Navigate to **Install App** and click **Reinstall to Workspace**
+
+## v1.12.0
+
+### Common Fate Terraform Module: Provisioner module now bundled in with the main module
+
+v1.12.0 adds a provisioner module deployment to the base common-fate module, this makes it easier to deploy the stack and also helps to ensure the release_tag is consistent between the modules.
+This is a non breaking change and teams will see the new provisioner is deployed alongside their existing provisioner.
+
+To upgrade to use the builtin provisioner, follow these steps:
+
+<Aside>
+  Note that this upgrade requires a brief period where provisioning will not be
+  available as you reconfigure the AWS roles for your integrations.
+</Aside>
+
+1. Copy your configuration blocks from the standalone provisioner to your main module keeping the original provisioner module. The config blocks are prefixed with `provisioner_` e.g `provisioner_aws_idc_config`
+   <Aside>
+     Users of the AWS IDC integration will need to add an additional required
+     field `idc_identity_store_id` to the config block when upgrading to the
+     builtin provisioner
+   </Aside>
+
+```hcl
+module "common-fate" {
+  source = "common-fate/common-fate-deployment/aws"
+  version = "1.12.0"
+
+  # New config block(s) added to your main module
+  provisioner_aws_idc_config = {
+    idc_identity_store_id = "<Your Identity Store ID>" # New required parameter added for aws_idc when using the builtin provisioner
+    ... existing config copied over
+  }
+}
+
+# Your existing provisioner module remains unchanged
+module "provisioner" {
+  source = "common-fate/common-fate-deployment/aws"
+  version = "1.12.0"
+
+  aws_idc_config = {
+    idc_instance_arn = "<Your Identity Center Instance ARN>"
+    idc_region       = "<Your Identity Center Region>"
+    role_arn         = "<ARN of the Common Fate Provision IAM role>"
+  }
+
+}
+```
+
+2. Apply the changes
+
+3. Update your Integration task roles to use the new builtin provisioner task role arn or name.
+   The following outputs have been added to the common_fate module
+
+```
+provisioner_task_role_name
+provisioner_task_role_arn
+```
+
+<Aside>
+  The `provisioner_task_role_name` and `provisioner_task_role_arn` both point to
+  the arn of the role in `v1.12.0`. This is a known issue and it has been fixed
+  in the latest version.
+</Aside>
+
+For the AWS integration, you will have to modify the resource with the source `common-fate/common-fate-deployment/aws//modules/aws-idc-integration/iam-roles` and update `common_fate_aws_provisioner_role_arn` to point to the output of the `provisioner_task_role_arn` from the main module.
+
+```
+common_fate_aws_provisioner_role_arn  = module.common-fate.provisioner_task_role_arn
+```
+
+For the GCP integration, you will have to modify the resource with the source `common-fate/common-fate-deployment/aws//modules/gcp-integration/workload-identity-roles` and update `common_fate_aws_provisioner_role_name` to point to the name of the `provisioner_task_role_name` from the main module.
+
+```
+ common_fate_aws_provisioner_role_name = "common-fate-prod-builtin-provisioner-ecs-tr"
+```
+
+4. Apply the changes
+
+5. Update the `url` of your `commonfate_webhook_provisioner` resource in your application config using the main module output `provisioner_url`
+
+```hcl
+resource "commonfate_webhook_provisioner" "provisioner" {
+  url = "http://common-fate-prod-builtin-provisioner.common-fate-prod-builtin.internal:9999"
+  ...
+}
+```
+
+6. Apply the changes and remove the old provisioner module as it is now no longer required after the migration is complete.
+
+## v1.9.0
+
+### Common Fate Terraform Module: Security improvements to deployment infrastructure
+
+<Aside>Users migrating from versions `<v1.7.0` are required to upgrade to `v1.8.0` before upgrading to `v1.9.0` due to  a multi step process to rotate out old security groups</Aside>
+Common Fate v1.9.0 includes the second required upgrade to security groups for the addition of names and descriptions.
+Additionally, v1.9.0 adds deletion protection to the RDS instance.
+
+## v1.8.0
+
+### Common Fate Terraform Module: Security improvements to deployment infrastructure
+
+v1.8.0 includes configuration changes to the `terraform-aws-common-fate-deployment` Terraform module to improve security.
+This includes:
+
+- Restricted security groups networking configuration used within the Common Fate VPC.
+- Introduced new EC2 security groups which have names and descriptions. Previously, our security groups did not have this information, which makes them difficult to attribute to the Common Fate deployment when inspecting them. In `v1.9.0`, ECS tasks will use these new security groups and the existing security groups will be removed.
+- ALB to drop invalid header fields
+- Enforce SQS queues to use server side encryption
+
+<Aside>Users migrating from versions `<v1.7.0` are required to upgrade to `v1.8.0` before upgrading to `v1.9.0` due to  a multi step process to rotate out old security groups</Aside>
+
+## v1.7.0
+
+### Common Fate terraform module: removed favicon variable
+
+Common Fate v1.7.0 removes the `favicon` variable from the common-fate module as support customizing the branding of the web app has been removed other than the login screen.
+To update your deployment, if you previously had a value configured for this, you will need to remove it.
+
+## v1.6.0
+
+### GCP Integration: Added JIT access for folders
+
+Common Fate v1.6.0 extends the GCP integration by adding support for JIT access to folders. Teams using the GCP integration will need to update their deployment and their `common-fate/common-fate-deployment/aws//modules/gcp-integration/workload-identity-roles` terraform module to version 1.6.0
+This update will add 2 new permissions to the provisioner role, granting it the ability to manage IAM roles on folders.
+
+- resourcemanager.folders.getIamPolicy
+- resourcemanager.folders.setIamPolicy
+
+In order to start requesting access to folders in GCP, you will need to update your commonfate_webhook_provisioner to direct GCP::Folder requests to your provisioner.
+
+```hcl
+resource "commonfate_webhook_provisioner" "prod" {
+  url = "<The provisioner_url output from the main module e.g http://common-fate-prod-builtin-provisioner.common-fate.prod.internal:9999>"
+  capabilities = [
+    {
+      target_type = "GCP::Project"
+      role_type   = "GCP::Role"
+      belonging_to = {
+        type = "GCP::Organization"
+        id   = "<Your GCP organization ID>"
+      }
+    },
+    {
+      target_type = "GCP::Folder"
+      role_type   = "GCP::Role"
+      belonging_to = {
+        type = "GCP::Organization"
+        id   = "<Your GCP organization ID>"
+      }
+    },
+  ]
+}
+```
+
+After this, you will need to reinstall the PagerDuty app in the deployment. You can do so by commenting out the `commonfate_pagerduty_integration` resource and then running `terraform apply`, and then adding it back in and running `terraform apply` again.
+
+Finally, follow the [GCP integration guide](../integrations/gcp#gcp-folder-selectors) to configure your selector and availabilities.
+
+## v1.5.0
+
+### Provisioner: New required parameters
+
+Common Fate v1.5.0 introduced the AWS RDS JIT integration. This integration add 4 new required parameters to the provisioner module in your Terraform deployment.
+
+To upgrade your deployment, add the 4 additional parameters to your provisioner module(s) `provisioner_service_client_id` `provisioner_service_client_secret` `auth_issuer` `app_url` as per the example below.
+
+```
+module "common-fate" {
+  source = "common-fate/common-fate-deployment/aws"
+  version = "1.5.0"
+  ...
+}
+
+
+module "provisioner" {
+  source = "common-fate/common-fate-deployment/aws"
+  version = "1.5.0"
+
+  # Existing unchanged parameters
+  namespace = local.namespace
+  stage     = local.stage
+  access_handler_sg_id              = module.common-fate.access_handler_security_group_id
+  aws_region                        = local.aws_region
+  release_tag                       = local.release_tag
+  subnet_ids                        = module.common-fate.private_subnet_ids
+  vpc_id                            = module.common-fate.vpc_id
+  ecs_cluster_id                    = module.common-fate.ecs_cluster_id
+
+  # New parameters added in v1.5.0
+  provisioner_service_client_id     = module.common-fate.provisioner_client_id
+  provisioner_service_client_secret = module.common-fate.provisioner_client_secret
+  auth_issuer                       = module.common-fate.auth_issuer
+  app_url                           = "<Your app URL>"
+
+}
+
+```
+
+### PagerDuty Integration: Added teams
+
+Common Fate v1.5.0 extends the PagerDuty integration by adding support for PagerDuty Teams that can be used when creating authorization policies.
+When authoring access policies, you can now use `PagerDuty::User` as well as `PagerDuty::Team`
+
+If you are using the PagerDuty integration then you will need to update the permissions granted to the Oauth app that you created in PagerDuty.
+
+1. To update the permissions, find the Common Fate App Registration within your PagerDuty admin panel `<your-team>.pagerduty.com/developer/applications` and open the detail page.
+
+2. On the **Edit App** page find the OAuth 2.0 section and Click **Manage** which takes you to the configuration for the OAuth 2.0 app.
+
+3. Under **Permission Scope** search for "Teams" and check the box for `Read Access`.
+
+4. Click **Confirm changes** > then **Save**
+
+5. You can now go ahead and update your deployment to v1.5.0
+
+## v1.2.0
+
+Common Fate v1.2.0 makes a breaking change to the provisioner module configuration. This change introduces blocks for each integration configuration.
+This helps to group the configuration and allows for reuse of parameter names for each integration.
+The configuration parameters for GCP and AWS are the same however they have now been shifted into the blocks `aws_idc_config` and `gcp_config` and the `provisioner_` prefix has been dropped.
+
+The provisioner module can now be configured for multiple integrations rather than just single integration, and as such the `provisioner_type = "GCP"` field has been dropped.
+The provisioner type will now be inferred from the configuration blocks.
+
+A limitation is that the provisioner only supports a single instance of each integration config block.
+If you are connecting to more that one AWS organization for example, you would deploy 2 instances of the provisioner.
+
+### Before
+
+```
+module "provisioner" {
+  source              = "common-fate/common-fate-deployment/aws//modules/provisioner"
+  version             = "1.1.0"
+  provisioner_type = "GCP"
+  ...
+
+  provisioner_aws_idc_instance_arn = "<Your Identity Center Instance ARN>"
+  provisioner_aws_idc_region       = "<Your Identity Center Region>"
+  provisioner_role_arn         = "<ARN of the Common Fate Provision IAM role>"
+
+
+  provisioner_gcp_workload_identity_config_json = jsonencode(<Your workload identity config>)
+
+}
+```
+
+### After
+
+```
+module "provisioner" {
+  source              = "common-fate/common-fate-deployment/aws//modules/provisioner"
+  version             = "1.2.0"
+  ...
+
+  aws_idc_config = {
+    idc_instance_arn = "<Your Identity Center Instance ARN>"
+    idc_region       = "<Your Identity Center Region>"
+    role_arn         = "<ARN of the Common Fate Provision IAM role>"
+  }
+
+  gcp_config = {
+    workload_identity_config_json = jsonencode(<Your workload identity config>)
+  }
+}
+```

@@ -1,0 +1,137 @@
+---
+title: "Okta"
+description: "Setup guide for the Common Fate Okta integration."
+---
+
+This guide will walk you through integrating Common Fate with Okta. By the end of this guide, you'll have a functioning integration with Common Fate, allowing it to provision access to Okta Groups.
+
+## Okta Setup
+
+To configure the Okta integration, follow these steps to create an API Token in your Okta Admin console.
+
+To create the API Token:
+
+1. Sign in to the Okta admin dashboard `https://<Your Okta Org ID>-admin.okta.com` .
+2. Browse to Security > API > Tokens.
+3. Select **Create token**.
+4. Enter a name e.g 'Common Fate'
+5. Click **Create Token**
+6. Save the newly created token somewhere safe for the next steps.
+
+You will need to create a new `SecretString` in SSM Parameter Store and then use the path when configuring your deployment in Terraform.
+
+You can use the AWS CLI to create a secret in the region you are deploying to. you must use the following path `"/<namespace>/<stage>/<secret name>"`.
+
+```bash
+aws ssm put-parameter \
+    --name "/common-fate/prod/okta-api-key" \
+    --value "mySecretValue" \
+    --type "SecureString"
+```
+
+## Configuring Common Fate
+
+In this section, you will register the Okta integration with your Common Fate deployment. At the end of this section you should have Common Fate ready to provision access. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).
+
+You will need your Organization ID, this is the prefix to your okta url, you can find this in the dropdown menu in the top right corner of the Okta Dashboard. For example `<Your Organization ID>.okta.com`
+
+Inside your Application Configuration repository, add the following module:
+
+```hcl
+resource "commonfate_okta_integration" "okta" {
+  name                      = "Okta"
+  organization_id           = "<Your Okta organization id>"
+  api_key_secret_path = "/common-fate/prod/okta-api-key"
+}
+```
+
+Apply the changes. If the apply succeeds, you should see the integration appear on the settings page in the web dashboard.
+
+## Provisioning access to Okta Groups
+
+You can now create an access workflow and availabilities:
+
+```hcl
+resource "commonfate_access_workflow" "okta" {
+  name                     = "okta"
+  access_duration_seconds  = 60 * 60 * 2
+  priority                 = 1
+}
+
+resource "commonfate_okta_group_selector" "select_all" {
+  id              = "example"
+  name            = "Example"
+  organization_id = "<Your Okta organization id>"
+  when            = "true"
+}
+
+
+resource "commonfate_okta_group_availabilities" "demo" {
+  workflow_id             = commonfate_access_workflow.okta.id
+  okta_group_selector_id = commonfate_okta_group_selector.select_all.id
+  organization_id               = "<Your Okta organization id>"
+}
+
+```
+
+## Okta group selectors
+
+To make Okta groups available for Just-In-Time (JIT) access you can add a `commonfate_okta_group_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_okta_group_selector` in conjunction with a `commonfate_okta_group_availabilities` and `commonfate_access_workflow` resources, as shown above.
+
+We've included some examples below.
+
+### Select a group by ID
+
+```hcl
+resource "commonfate_okta_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  organization_id = "<Your Okta organization id>"
+  when                = <<EOT
+  resource == Okta::Group::"abcd-1234-abcd-1234"
+  EOT
+}
+```
+
+### Select multiple groups by ID
+
+```hcl
+resource "commonfate_okta_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  organization_id = "<Your Okta organization id>"
+  when                = <<EOT
+  resource == Okta::Group::"abcd-1234-abcd-1234" || resource == Okta::Group::"efgh-5678-efgh-5678"
+  EOT
+}
+```
+
+### Select a group based on a naming pattern
+
+Select groups with a name ending in `-prod`:
+
+```hcl
+resource "commonfate_okta_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  organization_id = "<Your Okta organization id>"
+  when                = <<EOT
+  resource.name like "*-prod"
+  EOT
+}
+```
+
+Select groups with a name beginning with `Develop`:
+
+```hcl
+resource "commonfate_okta_group_selector" "example" {
+  id        = "example"
+  name      = "Example"
+  organization_id = "<Your Okta organization id>"
+  when                = <<EOT
+  resource.name like "Develop*"
+  EOT
+}
+```

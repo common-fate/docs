@@ -1,0 +1,38 @@
+---
+title: "Glossary"
+description: "Glossary"
+---
+
+### Entitlement
+
+An Entitlement is permission to access something. In Common Fate, an entitlement consists of the following components:
+| Component | Description |
+| -------- | ------------ |
+| Target | The resource the entitlement grants access to, such as an AWS Account or GCP Project. |
+| Role | The permissions the entitlement grants to the target resource, such as `AdministratorAccess` or `roles/editor`. |
+
+### Access Workflow
+
+An Access Workflow is configuration which defines the duration that entitlements are made available for. Access workflows contain
+
+### Entity Identifier (EID)
+
+Common Fate uses [Cedar EIDs](https://docs.cedarpolicy.com/policies/syntax-entity.html#entity-overview) to represent resources. An example of an EID is `AWS::Account::"123456789012"`.
+
+EIDs consist of a **type** (`AWS::Account`) and an ID (`123456789012`). The type indicates the particular type of resource being granted access to.
+
+### Core Identity
+
+A Core Identity is Common Fate's identifier for a particular user or service account. For a user, Common Fate's identifier looks like this: `CF::User::"usr_2ZDvUXOkW9VX9qSjupKLKxRypGN"`.
+
+### Domain Identity
+
+A Domain Identity is a user identifier in a system integrated with Common Fate.
+
+### Grant
+
+A Grant is time-bound access to an [Entitlement](#Entitlement).
+
+### Access Request
+
+An Access Request is a collection of [Grants](#Grant) requested by a user. Common Fate allows multiple entitlements to be requested together, and these are grouped together as an Access Request to make reviewing and approval easier. By default, approval actions will act on all Grants contained in an Access Request.

@@ -1,0 +1,201 @@
+---
+title: "Requesting Access"
+description: "Request Access using Common Fate"
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+You can request access using the CLI or the web application. There is a notable change in the Grant lifecycle compared to our open-source framework. Previously, in Glide, approved requests would be activated immediately. However, in asynchronous working environments, this posed challenges. For instance, if you requested access for a specific timeframe and the account owner was in a different timezone, you might miss the window of access.
+
+Common Fate uses a separate activation step after approval by the requestor. The following is the requesting access flow:
+
+![Cedar Authorization Workflow](../../authz/images/cedar-authorization-workflow.png)
+
+## Using the CLI
+
+### List Available Roles
+
+You can list the available entitlements with:
+
+```bash
+cf access list available
+```
+
+### Request Access
+
+You can request access to entitlements with:
+
+```bash
+cf access ensure --target AWS::Account::00123456789 --role AWSAdministratorAccess
+```
+
+Multiple `--target` and `--role` pairs can be specified to request access to multiple entitlements at once. If one entitlement needs approval and another is auto-approved, you'll receive two Access Requests back. For example:
+
+```bash
+cf access ensure --target AWS::Account::00123456789 --role AWSAdministratorAccess --target GCP::Project::develop-123 --role Editor
+```
+
+<Aside>
+  In versions >=v3.9.0 the requested target and role will be added automatically
+  to your `~/.aws/config` file. To disable this function when requesting access
+  include the `--skip-local-config-update` flag
+</Aside>
+
+### Approve Request
+
+Approve a pending access request:
+
+```bash
+cf access approve request --id req_2bK5UuJ9po73tgGmVRFPQGCA6vE
+```
+
+### Activate Request
+
+Re-run `cf access ensure` to activate access request:
+
+```bash
+cf access ensure --target GCP::Project::develop-123 --role Editor
+```
+
+The CLI indicates that access will be activated now. The user presses “Y” to confirm. Based on this, here are the meanings of the different states:
+
+- **GRANT_STATUS_UNSPECIFIED**: This represents the GRPC unspecified value for the enum. It should never be returned under normal operations.
+- **GRANT_STATUS_PROVISIONING**: Access is currently being provisioned.
+- **GRANT_STATUS_PENDING**: A grant exists, but it’s not yet active. If you encounter GRANT_STATUS_PENDING after running `cf access ensure`, manual review is required. Our CLI prints the request URL to stderr when run with the default output settings in this case.
+- **GRANT_STATUS_ACTIVE**: Access grant is active. If you see this status, you currently have access.
+- **GRANT_STATUS_CLOSED**: This indicates a grant that is no longer active.
+
+### Close Request
+
+Close a request that is no longer needed by:
+
+```bash
+cf access close request --id req_2bK5UuJ9po73tgGmVRFPQGCA6vE
+```
+
+### List Requests
+
+List all access requests in your deployment with their details:
+
+```bash
+cf access list requests
+```
+
+For JSON output, use the `--output json` flag with respective commands.
+
+## Using Slack
+
+### Request Access
+
+Navigate to your designated slack access channel, type `/access`, and select the Common Fate app.
+
+![Slack Commands](/images/end-user/slack-commands.png)
+
+Press enter after typing `/access` and you will be navigated to a pop-up through which
+you can select the resource type.
+
+![Slack Integrations List](/images/end-user/slack-integrations-list.png)
+
+A request access form will appear. Follow these steps:
+
+1. Select the target resource.
+2. Choose the appropriate role.
+3. Provide a reason for your request.
+4. A dropdown menu will appear for the access duration. Select the appropriate duration.
+5. Click "Submit" to finalize your request.
+
+### Approve Request
+
+Click the "Approve" button to approve the request:
+
+![Slack Approve](/images/end-user/slack-approve.png)
+
+### Activate Request
+
+Activation of approved access requests can only be done through the web console.
+
+### Extend Request
+
+Once an access request has been activated, the Common Fate slack app will send you a direct message.
+
+Click the "Extend" button to extend the request:
+
+![Slack Extend](/images/end-user/slack-extend.png)
+
+<Aside>
+  Extensions on the access request are only permitted if the configuration is
+  enabled. For setup instructions, refer to [Enabling Access Request
+  Extensions](https://docs.commonfate.io/config/workflows#enabling-access-request-extensions).
+</Aside>
+
+### Close Request
+
+Click the "Close" button to close the request:
+
+![Slack Close](/images/end-user/slack-approve.png)
+
+## Using the web console
+
+### Request Access
+
+1. Navigate to the "Request" tab in the sidebar. Search for and select the target:
+
+   ![Request Tab](/images/end-user/request.png)
+
+2. Select the desired role:
+
+   ![Select Role](/images/end-user/select-role.png)
+
+3. Review and provide the access reason. Click "Request Access":
+   ![Review Request](/images/end-user/review-request.png)
+
+### Approve Request
+
+Navigate to the Access tab in the sidebar, locate the request, and click Approve:
+
+![Approve Request](/images/end-user/approve.png)
+
+### Activate Request
+
+Navigate to the Access tab in the sidebar, locate the request, and click Activate:
+
+![Activate Request](/images/end-user/activate.png)
+
+If breakglass access is enabled, you can activate it by checking the confirmation box. Once confirmed, click the "Activate" button to proceed:
+
+![Breakglass Activate](/images/end-user/breakglass-activate.png)
+
+### Extend Request
+
+Navigate to the Access tab in the sidebar, locate the request, and click Extend:
+
+![Extend Request](/images/end-user/extend.png)
+
+<Aside>
+  Extensions on the access request are only permitted if the configuration is
+  enabled. For setup instructions, refer to [Enabling Access Request
+  Extensions](https://docs.commonfate.io/config/workflows#enabling-access-request-extensions).
+</Aside>
+
+### Close Request
+
+Navigate to the Access tab in the sidebar, locate the request, and click Close:
+
+![Close Request](/images/end-user/close.png)
+
+### Searching for an Entitlement
+
+The search bar on the new request page uses a fuzzy search by default. This search matches entitlements based on their target ID, type, name, and any node within the entitlements hierarchy. As a result, especially for randomized IDs, you might see more matches than expected. To refine your search results, you can use the following advanced search directives.
+
+White space acts as an AND operator, while a single pipe (|) character acts as an OR operator. To escape white space, use double quote ex. ="scheme language" for exact match.
+
+| Token        | Match type                 | Description                                |
+| ------------ | -------------------------- | ------------------------------------------ |
+| aws          | fuzzy-match                | Entitlements that fuzzy match aws          |
+| =12345678912 | exact-match                | Entitlements that are 12345678912          |
+| 'production  | include-match              | Entitlements that include production       |
+| !dev         | inverse-exact-match        | Entitlements that do not include dev       |
+| ^prod        | prefix-exact-match         | Entitlements that start with prod          |
+| !^dev        | inverse-prefix-exact-match | Entitlements that do not start with dev    |
+| security$    | suffix-exact-match         | Entitlements that end with security        |
+| !security$   | inverse-suffix-exact-match | Entitlements that do not end with security |

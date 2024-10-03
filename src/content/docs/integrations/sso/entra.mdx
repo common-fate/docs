@@ -86,7 +86,7 @@ You will now be on the application overview page.
 12. Under **Admin Credentials** set **tenant URL** to `https://<your app URL>/api/v1/scim/Entra`
 13. Under **Admin Credentials** set **Secret Token** to your secret generated previously
 14. Under **Mappings** go to the **Provision Microsoft Entra ID Users** settings and replace the **mailNickname** to **externalId** mapping: it must be **objectId** to **externalId**.
-    <img height="200" src="/images/entra/scim-mapping.png" />
+    <img height="200" src="assets/entra/scim-mapping.png" />
 15. Click **Test Connection** you should get a success message
 16. Navigate back to **Provisioning > Overview**
 17. Select **Start Provisioning**
@@ -137,7 +137,7 @@ Next, disable SCIM user provisioning in Entra ID for the Common Fate application
 
 Then, verify in Microsoft Entra that `objectId` is mapped to `externalId`:
 
-![SCIM Mapping](/images/entra/scim-mapping.png)
+![SCIM Mapping](assets/entra/scim-mapping.png)
 
 Now, run a dry-run of the reset:
 
@@ -157,11 +157,11 @@ Now, enable SCIM user provisioning again in Common Fate. You'll need to wait up 
 
 You may need to click the **Restart** button. Ensure that the your administrative page looks like the screenshot below to force a full sync.
 
-![SCIM Process Restart](/images/cf-entra-restart-scim.png)
+![SCIM Process Restart](assets/cf-entra-restart-scim.png)
 
 After the SCIM process is complete, visit the **Resources** page inside of Common Fate and verify that `Entra::User` resources are present in your deployment. Your Entra user resources should have an ID which looks similar to the screenshot below.
 
-![Entra Users](/images/cf-entra-users.png)
+![Entra Users](assets/cf-entra-users.png)
 
 Finally, revoke your permissions to reset SCIM by removing the Cedar policy you applied earlier for the `CF::Control::Integration::Reset::ResetService::Action::"ResetEntraUsers"` action.
 

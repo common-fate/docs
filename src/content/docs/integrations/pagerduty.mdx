@@ -14,16 +14,16 @@ To set up PagerDuty in your Common Fate deployment you will need to register an 
 1. Log into your PagerDuty account with an admin user. In the nav bar you will see an Integrations tab. Hover this and select "App Registrations".
 
 
-   ![PagerDuty Integrations Tab](./images/pagerduty/1.png)
+   ![PagerDuty Integrations Tab](assets/pagerduty/1.png)
 
 2. You will be taken to the App Registrations page, next click on the "New App" button in the top left.
 
-   ![App Registrations Page](./images/pagerduty/2.png)
+   ![App Registrations Page](assets/pagerduty/2.png)
 
 3. Here you will fill in some information about the app registration. The name can be called **Common Fate** and give any description you want. As an example: **Common Fate allows assigning just in time access to users in on-call schedules with PagerDuty.**
 
 - Make sure you select **OAuth 2.0** for the functionality. Click next.
-  ![App Registration Form](./images/pagerduty/3.png)
+  ![App Registration Form](assets/pagerduty/3.png)
 
 
 4. Under **Redirect Url's** make sure to add `<your app URL>/api/v1/oauth2/callback/pagerduty`

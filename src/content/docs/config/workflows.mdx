@@ -73,6 +73,37 @@ resource "commonfate_access_workflow" "workflow-demo" {
 }
 ```
 
+## Validating the reason on Access Requests
+
+<Aside>
+  Added in Common Fate v2.7. Requires Common Fate Terraform Provider v2.26.1
+  or later.
+</Aside>
+
+To require add validation to the reason on Access Requests for a particular workflow, you can specify the `validation` variable on the Access Workflow:
+
+```diff
+resource "commonfate_access_workflow" "workflow-demo" {
+  name                     = "demo"
+  access_duration_seconds  = 60 * 60
+  priority                 = 100
++  validation = {
++    reason_regex = [
++      {
++        regex_pattern = ".{20}",
++        error_message = "Reason must be at least 20 characters long",
++      },
++      {
++        regex_pattern = "CF-\\d+"
++        error_message = "Please include a ticket ID (CF-XXX)"
++      }
++    ]
++  }
+}
+```
+
+Make sure to double escape any backslash characters by using `\`. In the example above, the regex `\d+` needs to be escaped like `\\d+` so that Terraform is able to read the string.
+
 ## Specifying a default duration for Access Requests
 
 <Aside>
@@ -86,7 +117,7 @@ The Common Fate web console and CLI will default to the maximum duration when re
 resource "commonfate_access_workflow" "workflow-demo" {
   name                     = "demo"
   access_duration_seconds  = 60 * 60
-+ default_duration_seconds = 30 * 60
++  default_duration_seconds = 30 * 60
   priority                 = 100
 }
 ```

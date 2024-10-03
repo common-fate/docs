@@ -8,7 +8,7 @@ import { Aside } from '@astrojs/starlight/components';
 In the [Authorization Policy](/authz/introduction) guide we introduced you to our authorization system. Authorization decision points within Common Fate are governed using policy-as-code.
 
 Each time an authorization decision is made, Common Fate stores a log of the evaluation. In this guide you'll learn how to use authorization logs to debug your authorization policies.
-![Authorization Log List](/images/authz-log-list.png)
+![Authorization Log List](assets/authz-log-list.png)
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ By default, users in Common Fate don't have permission to view authorization log
 
 Find your Common Fate user ID in the web console by clicking on your profile in the lower corner, as shown below.
 
-![Find your Common Fate user ID](/images/cf-find-user-id.png)
+![Find your Common Fate user ID](assets/cf-find-user-id.png)
 
 Your user ID should look something like `usr_2ZaVKh5QwjlPsy1ImKc6GY2XbAf`.
 
@@ -54,25 +54,25 @@ permit(
 
 Once you've granted yourself access you should see an **Authorization** item appear in the navbar on the left of the web console. Click on the **Authorization** item to view the recent authorization evaluations. The graph at the top of the page shows a summary of decisions and latency for recent authorization evaluations. Failed authorizations are shown in red in the summary graph.
 
-![Authorization Log List](/images/authz-log-list.png)
+![Authorization Log List](assets/authz-log-list.png)
 
 You can view the details for a particular authorization evaluation by clicking on a table row, or clicking on the summary graph.
 
 You'll see a detail page similar to the below:
 
-![Evaluation Example](/images/cf-eval-example.png)
+![Evaluation Example](assets/cf-eval-example.png)
 
 Details on this page include the **Principal** (the user or service attempting to perform the action), the **Action** (what was being done), and the **Resource** (the entity the action was being performed on). Common Fate will also show whether the action was allowed or denied, as well as relevant authorization policies which contributed to the authorization decision.
 
 In some instances, you'll see policy recommendations on this page too. For example, if Common Fate couldn't find any policies granting or forbidding access, we'll generate a recommended policy for you to add:
 
-![No Matching Policy]( /images/cf-eval-example-no-matching-policy.png )
+![No Matching Policy]( assets/cf-eval-example-no-matching-policy.png )
 
 ## Access Requests
 
 If you have permission to view authorization events, Common Fate will show an additional _View Authorization_ button in the Access Request audit logs. You can click on this button to jump to the authorization policy evaluation associated with a particular action on an Access Request, like an approval or activation.
 
-![Authorization Audit Trail](/images/cf-access-request-authz-audit-trail.png)
+![Authorization Audit Trail](assets/cf-access-request-authz-audit-trail.png)
 
 ## Tags
 
@@ -88,8 +88,8 @@ Common Fate uses **Tags** to group authorization events on attributes. Tags are 
 To find authorization events faster, you can use filters in the Common Fate web console. By default, the web console filters out events that have a `read_only=true` tag or `simulation=true`. Filters are shown at the top of the web console.
 
 To add a filter based on a tag or an authorization decision, click the **Add Filter** button as shown below:
-![Add Filter](/images/cf-eval-add-filter.png)
+![Add Filter](assets/cf-eval-add-filter.png)
 
 You can also filter for authorization events relating to a particular principal, action, or resource by hovering over a table cell and clicking the funnel icon which appears, as shown below:
 
-![Filter Cell](/images/cf-eval-filter-cell.png)
+![Filter Cell](assets/cf-eval-filter-cell.png)

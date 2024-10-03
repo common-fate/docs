@@ -8,7 +8,7 @@ import { Aside } from '@astrojs/starlight/components';
 Common Fate's [AWS RDS](https://aws.amazon.com/rds/) integration allows your end users to request Just-In-Time (JIT) access to RDS databases, leveraging AWS SSM to connect via the Common Fate AWS Proxy service deployed to ECS in your account.
 The proxy service captures audit logs of all SQL commands executed by the user during their session which can be viewed in real-time.
 
-![Audit Logs Screenshot](/images/rds/audit-logs-screenshot.png)
+![Audit Logs Screenshot](assets/rds/audit-logs-screenshot.png)
 
 This guide will walk you through integrating Common Fate with AWS RDS. By the end of this guide, you'll have a functioning integration with Common Fate with Databases available for access.
 
@@ -37,13 +37,13 @@ The Permission Set grants the user access to connect to the proxy using SSM Star
 
 The user then uses the Granted CLI `granted rds proxy` to begin port-forwarding the database to their local machine.
 
-![Infrastructure Diagram](/images/rds/infra.png)
+![Infrastructure Diagram](assets/rds/infra.png)
 
 ## Audit Logging Queries
 
 The Common Fate RDS Proxy handles MySQL and Postgres connections at the wire protocol level. The proxy acts as a database server to the database client, and forwards commands to the target database after logging the queries to the session logs in Common Fate for the Grant.
 
-![Connection Flow](/images/rds/connection-flow.png)
+![Connection Flow](assets/rds/connection-flow.png)
 
 ## Deploying the Proxy
 

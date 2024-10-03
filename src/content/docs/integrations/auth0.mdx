@@ -18,15 +18,15 @@ To configure the Auth0 integration, create a Machine-To-Machine application in t
 
 In the Auth0 administrative console, browse to **Applications**.
 
-![Auth0 Setup Step 1](/images/auth0/setup-1.png)
+![Auth0 Setup Step 1](assets/auth0/setup-1.png)
 
 Name the application **Common Fate**. Choose **Machine to Machine Applications** as the application type.
 
-![Auth0 Setup Step 2](/images/auth0/setup-2.png)
+![Auth0 Setup Step 2](assets/auth0/setup-2.png)
 
 Click on the newly created application. Take a note of the **Domain**, **Client ID**, and **Client Secret** attributes, as you will need them in the next steps.
 
-![Auth0 Setup Step 3](/images/auth0/setup-3.png)
+![Auth0 Setup Step 3](assets/auth0/setup-3.png)
 
 You will need to create a new `SecretString` in SSM Parameter Store and then use the path when configuring your deployment in Terraform.
 

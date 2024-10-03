@@ -76,7 +76,7 @@ resource "commonfate_access_workflow" "workflow-demo" {
 ## Validating the reason on Access Requests
 
 <Aside>
-  Added in Common Fate v2.7. Requires Common Fate Terraform Provider v2.25.3
+  Added in Common Fate v2.7. Requires Common Fate Terraform Provider v2.26.1
   or later.
 </Aside>
 
@@ -88,7 +88,7 @@ resource "commonfate_access_workflow" "workflow-demo" {
   access_duration_seconds  = 60 * 60
   priority                 = 100
 + validation = {
-+   regex = [
++   reason_regex = [
 +     {
 +       regex_pattern = ".{20}",
 +       error_message = "Reason must be at least 20 characters long",

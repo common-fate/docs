@@ -87,18 +87,18 @@ resource "commonfate_access_workflow" "workflow-demo" {
   name                     = "demo"
   access_duration_seconds  = 60 * 60
   priority                 = 100
-+ validation = {
-+   reason_regex = [
-+     {
-+       regex_pattern = ".{20}",
-+       error_message = "Reason must be at least 20 characters long",
-+     },
-+     {
-+       regex_pattern = "CF-\\d+"
-+       error_message = "Please include a ticket ID (CF-XXX)"
-+     }
-+   ]
-+ }
++  validation = {
++    reason_regex = [
++      {
++        regex_pattern = ".{20}",
++        error_message = "Reason must be at least 20 characters long",
++      },
++      {
++        regex_pattern = "CF-\\d+"
++        error_message = "Please include a ticket ID (CF-XXX)"
++      }
++    ]
++  }
 }
 ```
 
@@ -117,7 +117,7 @@ The Common Fate web console and CLI will default to the maximum duration when re
 resource "commonfate_access_workflow" "workflow-demo" {
   name                     = "demo"
   access_duration_seconds  = 60 * 60
-+ default_duration_seconds = 30 * 60
++  default_duration_seconds = 30 * 60
   priority                 = 100
 }
 ```

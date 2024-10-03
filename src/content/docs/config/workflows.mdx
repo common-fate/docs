@@ -88,15 +88,15 @@ resource "commonfate_access_workflow" "workflow-demo" {
   access_duration_seconds  = 60 * 60
   priority                 = 100
 + validation = {
-+   regex = [{
++   regex = [
++     {
 +       regex_pattern = ".{20}",
 +       error_message = "Reason must be at least 20 characters long",
 +     },
 +     {
 +       regex_pattern = "CF-\\d+"
 +       error_message = "Please include a ticket ID (CF-XXX)"
-+     },
-+
++     }
 +   ]
 + }
 }

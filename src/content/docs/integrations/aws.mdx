@@ -71,6 +71,17 @@ module "common_fate_aws_roles" {
 }
 ```
 
+By default, the AWS IAM role for the provisioner does not have the required permissions to assign access to the organization management account. If you wish to use Common Fate to provision access to your organization management account, set the `permit_management_account_assignments` variable to `true`:
+
+```diff
+module "common_fate_aws_roles" {
+  source                                = "common-fate/common-fate-deployment/aws//modules/aws-idc-integration/iam-roles"
+  version                               = "1.22.0"
+  common_fate_aws_account_id            = "<Common Fate AWS Account ID>"
++  permit_management_account_assignments = true
+}
+```
+
   </TabItem>
 
   <TabItem label="Using the AWS Management Console">

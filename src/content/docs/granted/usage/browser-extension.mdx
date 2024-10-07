@@ -1,0 +1,56 @@
+---
+title: "Using the browser extension"
+banner:
+  content: |
+    Get audited access to RDS databases without a VPN using the Granted RDS Plugin.
+    <a href="/granted-rds">Learn more here</a>.
+---
+
+Granted can integrate with your web browser using the [Granted Chrome Extension](https://chromewebstore.google.com/detail/granted/cjjieeldgoohbkifkogalkmfpddeafcm) and the [Granted Firefox Add-On](https://addons.mozilla.org/en-GB/firefox/addon/granted/). These extensions provide security and usability improvements when working with AWS. The Granted Chrome Extension works with all Chromium-based browsers, such as Arc, Microsoft Edge, and Vivaldi.
+
+![Screenshot of the AWS IAM Identity Center login page, showing a confirmation code to be checked by the user. The Granted Browser Extension is installed and a banner is shown at the top of the page. The banner reads: "Granted is confirming your code automatically"](../images/browser-extension-automatic-code-confirm.png)
+
+Key features of the extensions are listed below.
+
+| Feature |  Granted Chrome Extension  | Granted Firefox Addon |
+| -------- | ------------------ | ---------------------- |
+| Automate parts of the AWS IAM Identity Center sign-in flow to [protect you from being phished for AWS credentials](https://www.commonfate.io/blog/granted-mitigates-aws-phishing) | ✅ | Coming Soon |
+| Open multiple AWS accounts in the same browser window, using Tab Containers | ❌ (Tab Containers are unsupported on Google Chrome) | ✅ |
+
+## Minimum Granted version
+
+The Granted Chrome Extension requires Granted v0.35 or later to be installed. To check your Granted version, run
+
+```bash
+granted -v
+```
+
+If you're on an earlier version, follow our [installation guide](/granted/getting-started#installing-the-cli) to update to the latest version.
+
+## Installing
+
+To install the extension, follow the links below:
+
+| Browser |  Install Link |
+| -------- | ------------------ |
+| Google Chrome | [Granted Chrome Extension](https://chromewebstore.google.com/detail/granted/cjjieeldgoohbkifkogalkmfpddeafcm) |
+| Arc | [Granted Chrome Extension](https://chromewebstore.google.com/detail/granted/cjjieeldgoohbkifkogalkmfpddeafcm) |
+| Microsoft Edge | [Granted Chrome Extension](https://chromewebstore.google.com/detail/granted/cjjieeldgoohbkifkogalkmfpddeafcm) |
+| Vivaldi | [Granted Chrome Extension](https://chromewebstore.google.com/detail/granted/cjjieeldgoohbkifkogalkmfpddeafcm) |
+| Chromium | [Granted Chrome Extension](https://chromewebstore.google.com/detail/granted/cjjieeldgoohbkifkogalkmfpddeafcm) |
+| Firefox | [Granted Firefox Add-On](https://addons.mozilla.org/en-GB/firefox/addon/granted/) |
+
+## Building from source
+
+The Granted Chrome Extension and the Granted Firefox Add-On are open source under an MIT licence:
+
+- [Granted Chrome Extension source code](https://github.com/common-fate/granted-browser-extension)
+- [Granted Firefox Add-On source code](https://github.com/common-fate/granted-containers)
+
+You can build the extension from source by following the documentation in the GitHub repositories for the extensions.
+
+## Troubleshooting
+
+If you're having issues using the browser extension, the following references may be helpful:
+
+- [Troubleshooting native messaging](/granted/troubleshooting#browser-extension-troubleshooting-native-messaging)

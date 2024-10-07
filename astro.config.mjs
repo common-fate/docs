@@ -153,6 +153,7 @@ export default defineConfig({
               items: [
                 { slug: "granted/usage/assuming-roles" },
                 { slug: "granted/usage/console" },
+                { slug: "granted/usage/browser-extension" },
                 { slug: "granted/usage/headless" },
                 { slug: "granted/usage/export-credentials" },
                 { slug: "granted/usage/dotenv" },

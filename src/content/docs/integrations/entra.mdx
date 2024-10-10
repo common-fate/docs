@@ -46,6 +46,10 @@ aws ssm put-parameter \
     --type "SecureString"
 ```
 
+## Granting access to role-assignable groups
+
+If you want to use Common Fate to grant access to [role-assignable groups](https://learn.microsoft.com/en-us/entra/identity/role-based-access-control/groups-concept), you will need to give the integration the `RoleManagement.ReadWrite.Directory` application permission.
+
 ## Configuring Common Fate
 
 In this section, you will register the Entra integration with your Common Fate deployment. At the end of this section you should have Common Fate ready to provision access. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).

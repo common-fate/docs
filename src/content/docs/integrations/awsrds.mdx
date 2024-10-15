@@ -127,7 +127,7 @@ Secrets managed by AWS RDS follow this format automatically.
 
 ## Endpoint overrides
 Common Fate will use the default endpoint pulled using the [aws_db_instance](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/db_instance.html#endpoint) data source.
-Sometimes it may be necessary to connect using a different endpoint than the default configured in the database module above. To solve this the database users configuration have an optional `endpoint` field which can be used to override the endpoint specified in the module.
+Sometimes it may be necessary to connect using a different endpoint than the default configured in the database module above. To solve this the database `users` configuration has an optional `endpoint` field which can be used to override the endpoint specified in the module.
 
 This can be used to strictly specify reader and writer endpoints for Aurora RDS instances.
 

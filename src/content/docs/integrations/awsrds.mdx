@@ -125,6 +125,32 @@ The AWS Secrets Manager secret value referenced by `password_secrets_manager_arn
 
 Secrets managed by AWS RDS follow this format automatically.
 
+## Endpoint overrides
+Common Fate will use the default endpoint pulled using the [aws_db_instance](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/db_instance.html#endpoint) data source.
+Sometimes it may be necessary to connect using a different endpoint than the default configured in the database module above. To solve this the database users configuration have an optional `endpoint` field which can be used to override the endpoint specified in the module.
+
+This can be used to strictly specify reader and writer endpoints for Aurora RDS instances.
+
+```
+module "database" {
+  source                  = "common-fate/proxy-resource-aws-rds/commonfate"
+  proxy_id                = module.proxy.proxy_id
+  rds_instance_identifier = "example"
+  name                    = "Prod Postgres Database"
+  app_url                 = "https://commonfate.example.com" // Your Common Fate App url
+  database                = "postgres" // The name of the database on the RDS instance
+  rds_security_group_id   = "sg-12345678912" // database security group id
+  region                  = "us-west-2"
+
+  users = [{
+     name                         = "Root"
+     username                     = "postgres"
+     password_secrets_manager_arn = "<The ARN of the Secrets Manager secret for this database user>"
+     endpoint = "custom-aurora-endpoint-test.cluster.ap-southeast-2.rds.amazonaws.com"
+  }]
+ }
+```
+
 ## Configuring Common Fate
 
 In this section, you will add selectors and availabilities so that users can request access to the databases. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).

@@ -31,11 +31,13 @@ For example, if you have an Access Workflow with a 2 hour access duration, creat
 
 The `priority` governs whether the policy will be used. If a different policy with a higher priority and the same role exists that one will be used over another.
 
-## Specifying an activation expiry
+## Configuring request expiry
 
 <Aside>
   Added in Common Fate v1.41.0. Requires Common Fate Terraform Provider v2.16 or
   later.
+
+  RequestedToApprovedExpiry and RequestedToActivateExpiry Added in Common Fate Terraform Provider v2.27.0.
 </Aside>
 
 Common Fate can be configured to automatically close approved requests if they are not activated within a particular duration. To configure an activation expiry, set the `activation_expiry` variable in the Access Workflow:
@@ -46,10 +48,16 @@ resource "commonfate_access_workflow" "workflow-demo" {
   access_duration_seconds  = 60 * 60
   priority                 = 100
 + activation_expiry        = 60 * 60 * 8
++ requested_to_approved_expiry = 60 * 60 * 4
++ requested_to_activate_expiry = 60 * 60 * 4
 }
 ```
 
-The `activation_expiry` cause requests to expire if they are approved but not activated for a specified amount of time.
+The `activation_expiry` causes requests to expire if they are approved but not *activated* for a specified amount of time following being approved.
+
+The `requested_to_activate_expiry` causes requests to expire if they are requested but not *approved* for a specified amount of time following being requested.
+
+The `requested_to_activate_expiry` causes requests to expire if they are approved but not *activated* for a specified amount of time following being requested.
 
 In the example above any requests approved but not activated after 8 hours will be closed, requiring the user to re-request access.
 
@@ -162,3 +170,43 @@ For example, with an initial access duration of 60 minutes:
 4. With a maximum of two extensions, you can add up to 20 minutes to your initial access duration.
 
 This approach ensures that extensions are used thoughtfully and only when necessary.
+
+
+## Multi-step Approvals
+Common Fate v2.8.0 introduced the ability to specify multi step approval flows inside Access Workflows.
+All conditions / steps on the approval flow must pass before the end user can activate a request.
+
+Multi-step approvals follow similar syntax to cedar policies in that they have a `when` clause to evaluate the reviewing user.
+
+The when expression can reference the `principal` and/or the `resource.grant`.
+
+```
+resource "commonfate_access_workflow" "workflow-demo" {
+    name                     = "demo"
+    access_duration_seconds  = 60 * 60
+    priority                 = 100
+    approval_steps = [
+        {
+        name = "Approval from Jack"
+        when = <<EOF
+        principal == CF::User::"usr_2ixfjkldsjlk23z09b1Da"
+        EOF
+        },
+        {
+        name = "Apporoval is Required from one of the Security Team"
+        when = <<EOF
+        principal in Entra::Group::"Security"
+        EOF
+        },
+    ]
+  }
+```
+
+Results in the following approval steps on a request for access.
+
+![Multi step approval.](assets/multi-step.png)
+
+Multi-step approvals require each step to be completed by a different reviewer.
+When a reviewer matches more than one of the approval steps, they will be automatically assigned to one. The other step will require action from a different user.
+
+In cases where multiple reviews are required and the reviewers match more than one of the steps, Common Fate will automatically reassign the reviewers to the steps such that all steps are satisfied and the request is approved.

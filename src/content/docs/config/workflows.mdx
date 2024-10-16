@@ -176,7 +176,9 @@ This approach ensures that extensions are used thoughtfully and only when necess
 Common Fate v2.8.0 introduced the ability to specify multi step approval flows inside Access Workflows.
 All conditions / steps on the approval flow must pass before the end user can activate a request.
 
-Multi-step approvals follow similar syntax to cedar policies in that they have a `when` clause to evaludate the reviewing user.
+Multi-step approvals follow similar syntax to cedar policies in that they have a `when` clause to evaluate the reviewing user.
+
+The when expression can reference the `principal` and/or the `resource.grant`.
 
 ```
 resource "commonfate_access_workflow" "workflow-demo" {

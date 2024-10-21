@@ -85,44 +85,44 @@ In order to use Granted you'll need to install it on your system. Common Fate pr
     #### For Intel (x86_64 architecture):
 
     ```bash
-    curl -OL https://releases.commonfate.io/granted/v0.35.1/granted_0.35.1_darwin_x86_64.tar.gz
-    sudo tar -zxvf ./granted_0.35.1_darwin_x86_64.tar.gz -C /usr/local/bin/
+    curl -OL https://releases.commonfate.io/granted/v0.35.2/granted_0.35.2_darwin_x86_64.tar.gz
+    sudo tar -zxvf ./granted_0.35.2_darwin_x86_64.tar.gz -C /usr/local/bin/
     ln -s /usr/local/bin/granted /usr/local/bin/assumego
     ```
 
     #### For ARM (arm64 architecture):
 
     ```bash
-    curl -OL https://releases.commonfate.io/granted/v0.35.1/granted_0.35.1_darwin_arm64.tar.gz
-    sudo tar -zxvf ./granted_0.35.1_darwin_arm64.tar.gz -C /usr/local/bin/
+    curl -OL https://releases.commonfate.io/granted/v0.35.2/granted_0.35.2_darwin_arm64.tar.gz
+    sudo tar -zxvf ./granted_0.35.2_darwin_arm64.tar.gz -C /usr/local/bin/
     ln -s /usr/local/bin/granted /usr/local/bin/assumego
     ```
 
     ## Reverting to an older version of Granted
 
-    If you need to revert to an older version of Granted, you can manually downgrade using the following steps. First, make sure to uninstall your current version of granted. Replace "0.35.1" with the specific version you want to install.
+    If you need to revert to an older version of Granted, you can manually downgrade using the following steps. First, make sure to uninstall your current version of granted. Replace "0.35.2" with the specific version you want to install.
 
     #### Using Homebrew
     ```
     brew uninstall granted
     brew tap-new $USER/local-tap
-    brew extract --version=0.35.1 common-fate/granted/granted $USER/local-tap
-    brew install granted@0.35.1
+    brew extract --version=0.35.2 common-fate/granted/granted $USER/local-tap
+    brew install granted@0.35.2
     ```
 
     #### For Intel (x86_64 architecture):
 
     ```bash
-    curl -OL https://releases.commonfate.io/granted/v0.35.1/granted_0.35.1_darwin_x86_64.tar.gz
-    sudo tar -zxvf ./granted_0.35.1_darwin_x86_64.tar.gz -C /usr/local/bin/
+    curl -OL https://releases.commonfate.io/granted/v0.35.2/granted_0.35.2_darwin_x86_64.tar.gz
+    sudo tar -zxvf ./granted_0.35.2_darwin_x86_64.tar.gz -C /usr/local/bin/
     ln -s /usr/local/bin/granted /usr/local/bin/assumego
     ```
 
     #### For ARM (arm64 architecture):
 
     ```bash
-    curl -OL https://releases.commonfate.io/granted/v0.35.1/granted_0.35.1_darwin_arm64.tar.gz
-    sudo tar -zxvf ./granted_0.35.1_darwin_arm64.tar.gz -C /usr/local/bin/
+    curl -OL https://releases.commonfate.io/granted/v0.35.2/granted_0.35.2_darwin_arm64.tar.gz
+    sudo tar -zxvf ./granted_0.35.2_darwin_arm64.tar.gz -C /usr/local/bin/
     ln -s /usr/local/bin/granted /usr/local/bin/assumego
     ```
 
@@ -171,24 +171,24 @@ In order to use Granted you'll need to install it on your system. Common Fate pr
       <TabItem label="x86_64">
 
         ```bash
-        curl -OL releases.commonfate.io/granted/v0.35.1/granted_0.35.1_linux_x86_64.tar.gz
-        sudo tar -zxvf ./granted_0.35.1_linux_x86_64.tar.gz -C /usr/local/bin/
+        curl -OL releases.commonfate.io/granted/v0.35.2/granted_0.35.2_linux_x86_64.tar.gz
+        sudo tar -zxvf ./granted_0.35.2_linux_x86_64.tar.gz -C /usr/local/bin/
         ```
 
       </TabItem>
       <TabItem label="arm64">
 
         ```bash
-        curl -OL releases.commonfate.io/granted/v0.35.1/granted_0.35.1_linux_arm64.tar.gz
-        sudo tar -zxvf ./granted_0.35.1_linux_arm64.tar.gz -C /usr/local/bin/
+        curl -OL releases.commonfate.io/granted/v0.35.2/granted_0.35.2_linux_arm64.tar.gz
+        sudo tar -zxvf ./granted_0.35.2_linux_arm64.tar.gz -C /usr/local/bin/
         ```
 
       </TabItem>
       <TabItem label="i386">
 
         ```bash
-        curl -OL releases.commonfate.io/granted/v0.35.1/granted_0.35.1_linux_i386.tar.gz
-        sudo tar -zxvf ./granted_0.35.1_linux_i386.tar.gz -C /usr/local/bin/
+        curl -OL releases.commonfate.io/granted/v0.35.2/granted_0.35.2_linux_i386.tar.gz
+        sudo tar -zxvf ./granted_0.35.2_linux_i386.tar.gz -C /usr/local/bin/
         ```
 
       </TabItem>
@@ -198,11 +198,11 @@ In order to use Granted you'll need to install it on your system. Common Fate pr
   <TabItem label="Windows">
     First, download the zip archive of Granted which matches your system's architecture. You can find your architecture by viewing your system properties in the Control Panel.
 
-    [Granted for Windows x86_64](https://releases.commonfate.io/granted/v0.35.1/granted_0.35.1_windows_x86_64.zip)
+    [Granted for Windows x86_64](https://releases.commonfate.io/granted/v0.35.2/granted_0.35.2_windows_x86_64.zip)
 
-    [Granted for Windows arm64](https://releases.commonfate.io/granted/v0.35.1/granted_0.35.1_windows_arm64.zip)
+    [Granted for Windows arm64](https://releases.commonfate.io/granted/v0.35.2/granted_0.35.2_windows_arm64.zip)
 
-    [Granted for Windows i386](https://releases.commonfate.io/granted/v0.35.1/granted_0.35.1_windows_i386.zip)
+    [Granted for Windows i386](https://releases.commonfate.io/granted/v0.35.2/granted_0.35.2_windows_i386.zip)
 
     After downloading Granted, unzip the package. Granted runs as two binaries, `assume` and `granted`. Any other files in the package can be removed, and Granted will still function.
 
@@ -224,7 +224,7 @@ To verify that the installation has succeeded, print the version of Granted by r
 ```
 ➜ granted -v
 
-Granted v0.35.1
+Granted v0.35.2
 ```
 
 If you have any issues installing don't hesitate to [ask for help on our Slack](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg).

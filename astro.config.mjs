@@ -117,6 +117,7 @@ export default defineConfig({
           items: [
             { slug: "integrations/aws" },
             { slug: "integrations/awsrds" },
+            { slug: "integrations/awseks" },
             { slug: "integrations/aws-resources" },
             { slug: "integrations/auth0" },
             { slug: "integrations/bigquery" },

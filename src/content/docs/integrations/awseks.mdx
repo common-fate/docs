@@ -1,12 +1,12 @@
 ---
 title: "AWS EKS"
-description: "Setup guide for the Common Fate AWS Kubernetes integration."
+description: "Setup guide for the Common Fate AWS EKS integration."
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 Common Fate's [AWS EKS](https://aws.amazon.com/eks/) integration allows your end users to request Just-In-Time (JIT) access to EKS clusters, leveraging AWS SSM to connect via the Common Fate AWS Proxy service deployed to ECS in your account.
-The proxy service captures audit logs of all sessions and shell sessions executed by the user during their time connected which can be viewed in real-time.
+The proxy service captures audit logs of all kubernetes API calls and exec shell sessions to pods in the cluster.
 
 ![Audit Logs Screenshot](assets/eks/audit-logs-screenshot.png)
 
@@ -35,21 +35,18 @@ module "common-fate-aws-roles" {
 When a user requests access to a cluster in Common Fate, the provisioner creates a Permission Set in IAM Identity Center with the name set to the grant ID. This Permission Set is assigned to the user and the Account containing the Proxy.
 The Permission Set grants the user access to connect to the proxy using SSM StartSession for the AWS-StartPortForwardingSession document only.
 
-The user then uses the Granted CLI `granted eks proxy` to begin port-forwarding the cluster to their local machine.
+The user then uses the Granted CLI `granted eks proxy` to begin a session which exposes the cluster to their local machine.
 
-![Infrastructure Diagram](assets/rds/infra.png)
 
-## Audit Logging Queries
+## Audit Logging API Calls
 
-The Common Fate EKS Proxy handles HTTP and SPDY connections at the shell exec protocol level. The proxy acts as a cluster server to the client, and forwards commands to the target cluster after logging the queries to the session logs in Common Fate for the Grant.
-
-![Connection Flow](assets/rds/connection-flow.png)
+The Common Fate EKS Proxy records all API calls made to the Cluster and records data streams opened via the exec API, such as when opening an interactive shell.
 
 ## Deploying the Proxy
 
 The proxy module is deployed into the account containing the target EKS instances.
 
-To deploy and register the proxy with Common Fate use our [commmon-fate-proxy-ecs](https://registry.terraform.io/modules/common-fate/common-fate-proxy-ecs/aws/latest) module which will handle deploying the ECS task and networking. Below is an example using the module.
+To deploy and register the proxy with Common Fate, use our [commmon-fate-proxy-ecs](https://registry.terraform.io/modules/common-fate/common-fate-proxy-ecs/aws/latest) module which will handle deploying the ECS task and networking. Below is an example using the module.
 
 To expose a cluster to Common Fate, you will need to register them with our [proxy-resource-aws-eks](https://registry.terraform.io/modules/common-fate/proxy-resource-aws-eks/commonfate/latest) Terraform module. Some examples have been provided below for configuring a cluster in Terraform.
 
@@ -102,7 +99,6 @@ module "eks" {
   proxy_id                  = module.proxy.id
   app_url                   = "https://commonfate.example.com" // Your Common Fate App url
   cluster_name              = "prod-cluster" //The name of the EKS cluster
-  create_default_rbac_roles = true // false by default. Will create admin and readonly RBAC roles inside of the cluster
 }
 
 
@@ -114,6 +110,21 @@ The common-fate/proxy-resource-aws-eks/commonfate module creates the necessary I
 ## Configuring Common Fate
 
 In this section, you will add selectors and availabilities so that users can request access to the EKS Clusters. You'll need to have [set up the Common Fate Application Configuration repository using our Terraform provider](/config/terraform).
+
+The proxy works by impersonating a user or service account in your cluster. You can register a service account in Common Fate using the following moduel, then create an availability spec which references it.
+For some examples of how to configure these service accounts, see the example module in [terraform here](https://github.com/common-fate/terraform-commonfate-proxy-resource-aws-eks/blob/main/modules/k8s-rbac/main.tf).
+
+```hcl
+resource "commonfate_proxy_eks_service_account" "eks_read_only" {
+  name                 = "Read Only"
+  service_account_name = "common-fate-readonly"
+}
+
+resource "commonfate_proxy_eks_service_account" "eks_admin" {
+  name                 = "Admin"
+  service_account_name = "common-fate-admin"
+}
+```
 
 You can create an access workflow, or use an existing one.
 ```hcl
@@ -166,7 +177,7 @@ Select a Cluster to connect to
    prod-cluster                        Read Only
 ```
 
-### Connect your database client
+### Configure your kube config file
 
 The CLI will provide the connection information, these are stable between grants for the same cluster and role.
 

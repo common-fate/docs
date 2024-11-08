@@ -1,0 +1,75 @@
+---
+title: "Jira"
+description: "Jira"
+---
+
+## Jira and Common Fate
+
+Common Fate integrates with Jira to provide additional context to access request justifications.
+
+## Prerequisites
+
+To set up Jira in your Common Fate deployment, create an app within your Atlassian developer console.
+
+1. Log into the [Atlassian developer portal](https://developer.atlassian.com/console/myapps) with an admin user. 
+
+2. Click **Create** then select **Oauth 2.0 integration.**
+
+![Create App](assets/jira/create-app.png)
+
+3. Name the integration **Common Fate** and give any description you want. As an example: **Common Fate allows assigning just in time access to users in on-call schedules with PagerDuty.**
+
+![Name App](assets/jira/name-app.png)
+
+4. Add permission scopes for Jira API access.
+
+![Add Permissions](assets/jira/add-scopes.png)
+   
+5. Select **View Jira issue data** then save.
+
+![Add Scopes](assets/jira/view-issue-scope.png)
+   
+6. Navigate to the Authorization tab, click **Add** then set the callback URL to `https://<Your Common Fate Deployment URL>/api/v1/oauth2/callback/jira`
+
+![Configure Callback](assets/jira/add-callback.png)
+   
+7. Navigate to Settings, copy the **Client Secret** value and save is as a secret in AWS Parameter Store, also make note of the **Client ID**.
+
+![Settings](assets/jira/auth-details.png)
+   
+
+You can use the AWS CLI to create a secret in the region you are deploying to, you must use the following path `"/<namespace>/<stage>/<secret name>"`
+
+```bash
+aws ssm put-parameter \
+    --name "/common-fate/prod/jira-client-secret" \
+    --value "mySecretValue" \
+    --type "SecureString"
+```
+
+5. In your configuration Terraform, add the following into your `main.tf` file
+
+```hcl
+resource "commonfate_jira_integration" "jira" {
+  name                = "Jira"
+  client_secret_secret_path = "/common-fate/prod/jira-client-secret"
+  client_id = "<Your jira application client ID>"
+}
+
+```
+
+6. Run a deployment
+
+```hcl
+terraform apply
+```
+
+## Add a Jira ticket to an access request
+
+When requesting access via the Common Fate console, you can type "@" followed by the name of your ticket in Jira to mention it in your request.
+
+![Mention Ticket](assets/jira/add-ticket-to-request.png)
+
+## Support
+
+If you need assistance with this integration, please contact [support@commonfate.io](mailto:support@commonfate.io), or join our Slack community [here](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg), we're happy to help!

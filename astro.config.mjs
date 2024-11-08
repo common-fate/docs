@@ -129,6 +129,10 @@ export default defineConfig({
           ],
         },
         {
+          label: "Context Integrations",
+          items: [{ slug: "integrations/jira" }],
+        },
+        {
           label: "Notification Integrations",
           items: [
             { slug: "integrations/slack" },

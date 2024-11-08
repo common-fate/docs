@@ -1,0 +1,52 @@
+---
+title: "Integrations"
+description: "Learn how to inspect and debug integrations within Common Fate."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+In the integrations guide we introduced you to connecting Common Fate to external tools for authorization and identity. This guide will show you how to check the health of these integrations and debug issues.
+
+## Grant the required permissions
+
+By default, users in Common Fate don't have permission to view integrations. To give yourself access, you'll need to add a Cedar policy allowing the `CF::Admin::Action::"Read"` action. To grant yourself access you'll need your Common Fate user ID.
+
+Find your Common Fate user ID in the web console by clicking on your profile in the lower corner, as shown below.
+
+![Find your Common Fate user ID](assets/cf-find-user-id.png)
+
+Your user ID should look something like `usr_2ZaVKh5QwjlPsy1ImKc6GY2XbAf`.
+
+Then, [add a Cedar policy](/authz/introduction#deploying-authorization-policies-to-terraform) which grants access to the `CF::Admin::Action::"Read"` action:
+
+```js
+permit(
+  principal == CF::User::"<YOUR_USER_ID_HERE>", // replace with your user ID, e.g. CF::User::"usr_2ZaVKh5QwjlPsy1ImKc6GY2XbAf"
+  action in CF::Admin::Action::"Read", // important: use 'in' rather than '==', because this is a group of actions
+  resource
+);
+```
+
+## Usage
+
+Once you've granted yourself access you should see an **Integrations** item appear in the navbar on the **Settings** page. Click on the **Integrations** item to view the list of integrations.
+
+![Integration List](assets/integrations/list-integrations.png)
+
+You can view the details for a particular intergation by clicking on it.
+
+You'll see a detail page similar to the below:
+
+![Integration Detail](assets/integrations/integration-detail.png)
+
+Details on this page include the configuration for the integration, as well as a table of background sync jobs associated with the integration, and their status.
+
+In some instances, integration sync tasks may fail. In these case, you'll see an error message describing what went wrong.
+
+## Run a sync job on demand
+
+You can trigger a sync job on demand by pressing the **Run Sync** button, however this action requires an additional permission.
+
+You can see the [Administering Common Fate](/setup/built-in-roles) section to request access to the deployment administration role.
+
+Once you have this role, you will be able to trigger a sync run.

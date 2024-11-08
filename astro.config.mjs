@@ -100,6 +100,7 @@ export default defineConfig({
             { slug: "observability/events" },
             { slug: "observability/authorization" },
             { slug: "observability/preview-access" },
+            { slug: "observability/integrations" },
           ],
         },
         {

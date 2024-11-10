@@ -183,19 +183,21 @@ Navigate to the Access tab in the sidebar, locate the request, and click Close:
 
 ![Close Request](assets/end-user/close.png)
 
-### Searching for an Entitlement
+### Force Close Request
 
-The search bar on the new request page uses a fuzzy search by default. This search matches entitlements based on their target ID, type, name, and any node within the entitlements hierarchy. As a result, especially for randomized IDs, you might see more matches than expected. To refine your search results, you can use the following advanced search directives.
+In certain cases, like removing an integration while a grant was still active, you may find some grants cannot be closed automatically.
+In these cases, you may use the force close option to mark these requests as closed without performing any deprovisioning steps.
 
-White space acts as an AND operator, while a single pipe (|) character acts as an OR operator. To escape white space, use double quote ex. ="scheme language" for exact match.
+To be able to see the force close option, you will need to deploy a cedar policy which permits you to use the action.
 
-| Token        | Match type                 | Description                                |
-| ------------ | -------------------------- | ------------------------------------------ |
-| aws          | fuzzy-match                | Entitlements that fuzzy match aws          |
-| =12345678912 | exact-match                | Entitlements that are 12345678912          |
-| 'production  | include-match              | Entitlements that include production       |
-| !dev         | inverse-exact-match        | Entitlements that do not include dev       |
-| ^prod        | prefix-exact-match         | Entitlements that start with prod          |
-| !^dev        | inverse-prefix-exact-match | Entitlements that do not start with dev    |
-| security$    | suffix-exact-match         | Entitlements that end with security        |
-| !security$   | inverse-suffix-exact-match | Entitlements that do not end with security |
+```js
+permit (
+    principal == CF::User::"<Your user id>",
+    action == Access::Action::"ForceClose",
+    resource
+);
+```
+
+Navigate to the Access tab in the sidebar, locate the request, and click Close. If an error happens, you will see an additional popup action to force close the request.
+
+![Force Close Request](assets/end-user/force-close.png)

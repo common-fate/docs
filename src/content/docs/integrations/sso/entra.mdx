@@ -174,3 +174,22 @@ Finally, revoke your permissions to reset SCIM by removing the Cedar policy you 
 -  resource
 -);
 ```
+
+## Allowing IDP-initiated sign in
+
+IDP-initiated sign in is supported in Common Fate version 2.8.2 and later. If you're using a BYOC deployment, you must set the `saml_allow_idp_initiated_sign_in` to `true` in your deployment Terraform module:
+
+```diff
+module "common-fate-deployment" {
+  source                           = "common-fate/common-fate-deployment/aws"
++  saml_allow_idp_initiated_sign_in = true
+}
+```
+
+Then, specify the following Relay State within the Entra SAML single sign on settings:
+
+```
+identity_provider=Entra&client_id=<Web Client ID>&redirect_uri=https://<Deployment URL>/auth/callback&response_type=code&scope=openid+email
+```
+
+Where `<Web Client ID>` is the OIDC client ID of the web application, obtained from the Cognito settings in AWS, and `<Deployment URL>` is the URL of your Common Fate deployment.

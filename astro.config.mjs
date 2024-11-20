@@ -50,7 +50,7 @@ export default defineConfig({
             { slug: "setup/backups" },
             { slug: "setup/alerts" },
             { slug: "setup/managed-monitoring" },
-            { slug: "setup/custom-resource-instances" },
+            { slug: "setup/compute" },
           ],
         },
         {

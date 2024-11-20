@@ -3,14 +3,31 @@ title: "Custom Resource Instance Classes"
 description: "Configure your Common Fate deployment with more powerful AWS Resources."
 ---
 
+## Set Control Plane Compute
+Updating the Control Plane compute has zero downtime and can be done whenever. If you are experiencing higher latencies and sluggish application performance you may need to bump the compute of the ECS task.
+
+This can be done with the following Terraform fields
 
 
-## Set RDS Compute CPU and Memory
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  control_plane_ecs_task_cpu    = "2048"
++  control_plane_ecs_task_memory = "4096"
+
+}
+
+```
+
+See documentation on task sizes from AWS [here](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_size)
+
+## Set RDS Compute
 See AWS official documentation for the different RDS instance class types [here](https://aws.amazon.com/rds/instance-types/)
 
 Upgrading or downgrading an RDS instance class will result in a downtime of around 20 minutes.
 
-### Upgrade with downtime
 
 First start by turning on maintenance mode by adding the following to your deployment terraform module:
 

@@ -43,3 +43,15 @@ module "common-fate-deployment" {
 
 ```
 `terraform apply` that change and it will begin upgrading the instance type.
+
+
+Finally once the Terraform has been applied, check in the AWS console that the RDS instance is *Available* and when it is you can safely turn maintenance mode back off:
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  maintenance_mode_enabled = false
+
+}

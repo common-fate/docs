@@ -1,0 +1,90 @@
+---
+title: "Custom Resource Instance Classes"
+description: "Configure your Common Fate deployment with more powerful AWS Resources."
+---
+
+
+
+## Set RDS Compute CPU and Memory
+See AWS official documentation for the different RDS instance class types [here](https://aws.amazon.com/rds/instance-types/)
+
+Upgrading or downgrading an RDS instance class will result in a downtime of around 20 minutes.
+
+### Upgrade with downtime
+
+First start by turning on maintenance mode by adding the following to your deployment terraform module:
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  maintenance_mode_enabled = true
+
+}
+
+```
+`terraform apply` that change. This will create a new load balancer rule to not allow any traffic to the application during the maintenance period.
+
+Once the application is in maintenance mode, you'll know this by checking the console and seeing that it is returning "Common Fate is currently down for maintenance. You can get in touch with us at support@yourcomapny.io.".
+
+Make a snapshot of the RDS instance. You can do this from the console in the actions dropdown. Select the correct DB instance and give the snapshot a memorable name like "snapshot-for-instance-upgrade".
+
+Update the Terraform module again to update the `rds_instance_type`
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  rds_instance_type = "db.t3.large"
+
+}
+
+```
+`terraform apply` that change and it will begin upgrading the instance type.
+
+### Blue green deployment minimal downtime
+If to circumvent the larger downtime explained above we can make use of a blue green deployment strategy to create a new instance using a snapshot and cutover to it once it has been created.
+
+Start by turning on maintenance mode. This will ensure no data is lost when making the snapshot
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  maintenance_mode_enabled = true
+
+}
+
+```
+And `terraform apply` that change. This will create a new load balancer rule to not allow any traffic to the application during the maintenance period.
+
+Once the application is in maintenance mode, you'll know this by checking the console and seeing that it is returning "Common Fate is currently down for maintenance. You can get in touch with us at support@yourcomapny.io.".
+
+Make a snapshot of the RDS instance. You can do this from the console in the actions dropdown. Select the correct DB instance and give the snapshot a memorable name like "snapshot-for-instance-upgrade".
+
+Remove the old RDS instance from your terraform state with:
+```
+terraform state rm 'module.common-fate.module.control_plane_db.aws_db_instance.pg_db'
+```
+
+Update your deployment terraform with the following
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  rds_snapshot_identifier = "encryped-snapshot-prod" //name of the encrypted snapshot that you made above
++  rds-suffix          = "v2" //a suffix to make sure a new instance is created with a new name instead of the old one.
++  rds_instance_type = "db.t3.large" //updated instance type
+
+}
+
+```
+
+Apply the change and you should see that a new rds instance will be created and all the networking will be updated.
+
+Turn off maintenance mode and check that all data is showing up correctly.
+
+There will now be 2 rds instances, it is up to the maintainer to remove the old one once all checks have passed with the new encrypted instance.

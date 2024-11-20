@@ -1,0 +1,81 @@
+---
+title: "Compute"
+description: "Configure the Compute Common Fate deployment."
+---
+
+## Set Control Plane, Access Handler and Worker Compute
+If you are experiencing higher latencies and sluggish application performance you may need to increase the compute.
+You can adjust the CPU and Memory allocation at any time for the ECS services in your deployment without any downtime.
+
+This can be done with the following Terraform fields
+
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  control_plane_ecs_task_cpu    = "2048"
++  control_plane_ecs_task_memory = "4096"
+
++  worker_ecs_task_cpu    = "2048"
++  worker_ecs_task_memory = "4096"
+
++  access_handler_ecs_task_cpu    = "2048"
++  access_hander_ecs_task_memory = "4096"
+
+}
+
+```
+
+See documentation on task sizes from AWS [here](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_size)
+
+## Set RDS Instance Type
+See AWS official documentation for the different RDS instance class types [here](https://aws.amazon.com/rds/instance-types/)
+
+Upgrading or downgrading an RDS instance class will result in a downtime of around 20 minutes.
+
+
+First start by turning on maintenance mode by adding the following to your deployment terraform module:
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  maintenance_mode_enabled = true
+
+}
+
+```
+`terraform apply` that change. This will create a new load balancer rule to not allow any traffic to the application during the maintenance period.
+
+Once the application is in maintenance mode, you'll know this by checking the console and seeing that it is returning "Common Fate is currently down for maintenance. You can get in touch with us at support@yourcomapny.io.".
+
+Make a snapshot of the RDS instance. You can do this from the console in the actions dropdown. Select the correct DB instance and give the snapshot a memorable name like "snapshot-for-instance-upgrade".
+
+Update the Terraform module again to update the `rds_instance_type`
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  rds_instance_type = "db.t3.large"
+
+}
+
+```
+`terraform apply` that change and it will begin upgrading the instance type.
+
+
+Finally once the Terraform has been applied, check in the AWS console that the RDS instance is *Available* and when it is you can safely turn maintenance mode back off:
+
+```diff
+module "common-fate-deployment" {
+  source                = "common-fate/common-fate-deployment/aws"
+  ... other parameters
+
++  maintenance_mode_enabled = false
+
+}

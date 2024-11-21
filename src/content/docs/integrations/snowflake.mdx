@@ -135,7 +135,7 @@ Snowflake Database Selector
 resource "commonfate_snowflake_database_selector" "snowflake_db" {
   id                   = "snowflake_db_selector"
   name                 = "Database ABC"
-  snowflake_account_id = "JF68992"
+  snowflake_account_id = "AB12345"
   when                = <<EOT
   resource == Snowflake::Database::"replace-this-with-your-database-name"
   EOT

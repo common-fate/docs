@@ -7,9 +7,9 @@ description: "Snowflake"
 
 Common Fate integrates with Snowflake to grant/revoke database access when access is requested and approved.
 
-To configure the Snowflake integration, Common Fate requires a Snowflake account with ACCOUNTADMIN role or SECURITYADMIN role to create the necessary service account and role.
+To configure the Snowflake integration, Common Fate requires a Snowflake account with `ACCOUNTADMIN` role or `SECURITYADMIN` role to create the necessary service account and role.
 
-We create a dedicated integration user with minimal permissions instead of using ACCOUNTADMIN to follow the principle of least privilege. This integration user will only have permissions to:
+We create a dedicated integration user with minimal permissions instead of using `ACCOUNTADMIN` to follow the principle of least privilege. This integration user will only have permissions to:
 
     - View users and databases
     - Create and manage roles

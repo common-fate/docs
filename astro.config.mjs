@@ -127,6 +127,7 @@ export default defineConfig({
             { slug: "integrations/gcp" },
             { slug: "integrations/iam-identity-center-groups" },
             { slug: "integrations/okta" },
+            { slug: "integrations/snowflake" },
           ],
         },
         {

@@ -1,0 +1,168 @@
+---
+title: "Snowflake"
+description: "Snowflake"
+---
+
+## Snowflake Integration
+
+Common Fate integrates with Snowflake to grant/revoke database access when access is requested and approved.
+
+To configure the Snowflake integration, Common Fate requires a Snowflake account with ACCOUNTADMIN role or SECURITYADMIN role to create the necessary service account and role.
+
+We create a dedicated integration user with minimal permissions instead of using ACCOUNTADMIN to follow the principle of least privilege. This integration user will only have permissions to:
+
+    - View users and databases
+    - Create and manage roles
+    - Grant and revoke roles
+
+## Prerequisites
+
+1. Log in to Snowflake at https://app.snowflake.com
+2. Switch to ACCOUNTADMIN or SECURITYADMIN role by running:
+
+```sql
+USE ROLE ACCOUNTADMIN;
+```
+
+3. Run the following commands line by line to create the integration role and user:
+
+```sql
+-- Create the integration role for Common Fate to manage Snowflake access
+CREATE ROLE IF NOT EXISTS COMMONFATE_INTEGRATION_ROLE;
+
+-- Allow the role to manage role grants and revokes
+GRANT MANAGE GRANTS ON ACCOUNT TO ROLE COMMONFATE_INTEGRATION_ROLE;
+
+-- Allow the role to create new roles
+GRANT CREATE ROLE ON ACCOUNT TO ROLE COMMONFATE_INTEGRATION_ROLE;
+
+-- Allow the role to use the default warehouse
+GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE COMMONFATE_INTEGRATION_ROLE;
+
+-- Allow the role to manage database roles. Note that you will need to execute this for each database you have.
+GRANT USAGE ON DATABASE <DATABASE_NAME> TO ROLE COMMONFATE_INTEGRATION_ROLE;
+
+-- Create the service user that Common Fate will use
+CREATE USER IF NOT EXISTS COMMONFATE_INTEGRATION_USER
+   PASSWORD = '<choose_a_secure_password>'
+   DEFAULT_ROLE = COMMONFATE_INTEGRATION_ROLE
+   MUST_CHANGE_PASSWORD = FALSE;
+
+-- Grant the integration role to the service user
+GRANT ROLE COMMONFATE_INTEGRATION_ROLE TO USER COMMONFATE_INTEGRATION_USER;
+
+-- Verify the configuration
+SHOW GRANTS TO ROLE COMMONFATE_INTEGRATION_ROLE;
+SHOW GRANTS TO USER COMMONFATE_INTEGRATION_USER;
+```
+
+4. You can use the AWS CLI to create a secret in the region you are deploying to, you must use the following path `"/<namespace>/<stage>/<secret name>"`
+
+```bash
+aws ssm put-parameter \
+    --name "/common-fate/prod/snowflake-password" \
+    --value "<insert the secure password of created integration user>" \
+    --type "SecureString"
+```
+
+5. Run these commands to get the required connection details:
+
+```sql
+-- Get account identifier and region
+SELECT
+    current_account() as account_id,
+    REGEXP_REPLACE(
+        LOWER(
+            REGEXP_REPLACE(current_region(), '^(AWS|AZURE|GCP)_', '')
+        ),
+        '_',
+        '-'
+    ) as region;
+```
+
+6. In your configuration Terraform, add the following into your `main.tf` file
+
+```hcl
+resource "commonfate_snowflake_integration" "snowflake_integration" {
+  name                = "Snowflake"
+  account_id           = "<account-id>"
+  region               = "<region>"
+  username             = "<username of created integration user>"
+  password_secret_path = "/common-fate/prod/snowflake-password"
+}
+
+```
+
+- Account ID: Use the account_id from the query result in step 5
+- Region: Use the region from the query result in step 5
+- Username: Use the username of the integration user created in step 3. If you ran the commands as is, it would be `COMMONFATE_INTEGRATION_USER`
+
+## Provisioning access to Snowflake Account
+
+To make a Snowflake account available for Just-In-Time (JIT) access you can add a `commonfate_snowflake_account_availability` resource to your Common Fate application Terraform code.
+
+You'll need to use the `commonfate_snowflake_account_availability` in conjunction with a `commonfate_access_workflow` resources.
+
+Snowflake Account Availability
+
+```hcl
+resource "commonfate_snowflake_account_availability" "snowflake_account" {
+  workflow_id            = commonfate_access_workflow.snowflake.id
+  snowflake_account_role = "ORGADMIN"
+  snowflake_account_id   = "AB12345"
+}
+```
+
+Access workflow
+
+```hcl
+resource "commonfate_access_workflow" "snowflake" {
+  name                    = "Snowflake"
+  access_duration_seconds = 60 * 60 * 10
+  priority                = 3
+}
+```
+
+## Provisioning access to Snowflake Database
+
+To make Snowflake databases available for Just-In-Time (JIT) access you can add a `commonfate_snowflake_database_selector` [Selector](/config/selectors) resource to your Common Fate application Terraform code. As shown below, the `when` clause in the resource is a [Cedar](https://cedarpolicy.com/) expression. You can use any [Cedar operator](https://docs.cedarpolicy.com/policies/syntax-operators.html) in the `when` clause, such as `&&` and `||` to combine conditions.
+
+You'll need to use the `commonfate_snowflake_database_selector` in conjunction with a `commonfate_snowflake_database_availabilities` and `commonfate_access_workflow` resources.
+
+Snowflake Database Selector
+
+```hcl
+resource "commonfate_snowflake_database_selector" "snowflake_db" {
+  id                   = "snowflake_db_selector"
+  name                 = "Database ABC"
+  snowflake_account_id = "JF68992"
+  when                = <<EOT
+  resource == Snowflake::Database::"replace-this-with-your-database-name"
+  EOT
+}
+```
+
+Snowflake Database Availability
+
+```hcl
+resource "commonfate_snowflake_database_availabilities" "snowflake_db" {
+  workflow_id                    = commonfate_access_workflow.snowflake.id
+  snowflake_database_role        = "DATABASE_ROLE_NAME"
+  snowflake_database_selector_id = commonfate_snowflake_database_selector.snowflake_db.id
+}
+
+```
+
+Access workflow
+
+```hcl
+resource "commonfate_access_workflow" "snowflake" {
+  name                    = "Snowflake"
+  access_duration_seconds = 60 * 60 * 10
+  priority                = 3
+}
+```
+
+## Support
+
+If you need assistance with this integration, please contact [support@commonfate.io](mailto:support@commonfate.io), or join our Slack community [here](https://join.slack.com/t/commonfatecommunity/shared_invite/zt-q4m96ypu-_gYlRWD3k5rIsaSsqP7QMg), we're happy to help!

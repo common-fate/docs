@@ -1,0 +1,192 @@
+---
+title: "Assume Roles in Commands"
+---
+
+## overview
+
+Normally we are prompted to choose a role when using assume however there are options available which make it possible to build scripts that assume without prompt (unless your token has expired)
+
+This workflow/recipe is suitable for people who need to perform attended scripts using their SSO.
+
+It can also be adapted to script across multiple accounts in your org which is otherwise relatively tedeous.
+
+This solution builds upon the basic concept of the inline-role-assumption
+
+
+## bash assume single account example
+
+In bash you need to ensure the current profile has been correctly exported, more recently some alias bugs have prevented the behavior working reliably so in scripts we can just avoid this issue entirely by being more explicit.
+
+```bash
+#!/bin/bash
+
+# Function to check if the user is logged into AWS SSO
+check_aws_login() {
+  echo "Checking AWS SSO session..."
+  if ! aws sts get-caller-identity --query "Arn" --output text >/dev/null 2>&1; then
+    echo "Error: AWS SSO session is not active. Please log in using 'aws sso login'."
+    exit 1
+  fi
+  echo "AWS SSO session is active."
+}
+
+# Function to check if access logging is enabled for a given S3 bucket
+check_access_logging() {
+  local bucket_name=$1
+  logging_status=$(aws s3api get-bucket-logging --bucket "$bucket_name" --query "LoggingEnabled" --output text 2>/dev/null)
+
+  if [[ "$logging_status" == "None" ]]; then
+    echo "Bucket: $bucket_name - Access logging is NOT enabled."
+  fi
+}
+
+# Main script execution starts here
+SSO_ACCOUNT="example/AWSAdministratorAccess"
+
+echo "Assuming Account: $SSO_ACCOUNT..." && . assume $SSO_ACCOUNT
+
+check_aws_login
+
+# List all S3 buckets in the current AWS account
+buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+
+if [[ -z "$buckets" ]]; then
+  echo "No buckets found in the account."
+  exit 0
+fi
+
+echo "Checking access logging for buckets..."
+echo "==================================="
+
+# Iterate over the list of buckets and check access logging
+for bucket in $buckets; do
+  check_access_logging "$bucket"
+done
+assume --unset
+```
+
+## Python assume single account example
+
+In python we still rely on the assume command via the subprocess.run command. As the example below shows.
+
+in this case we need to use `assume -x` and rely on those exported credentials being available for the boto3 library in the env.
+
+```Python
+import subprocess
+import boto3
+from datetime import datetime, timedelta, timezone
+
+# Function to invoke `assume` command via subprocess
+def assume_role(account):
+    print(f"Assuming account: {account}")
+    result = subprocess.run(
+        f"assume -x {account}",
+        shell=True,
+        executable="/bin/bash",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    if result.returncode != 0:
+        print(f"Error assuming account: {result.stderr.decode().strip()}")
+        exit(1)
+    print("Assumed successfully!")
+
+def unset_assume_role():
+    print("Unsetting assume role...")
+    result = subprocess.run(
+        ["assume", "--unset"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        print(f"Error unsetting assume role: {result.stderr.strip()}")
+    else:
+        print("Assume role unset successfully.")
+
+
+# Function to find IAM users with old keys
+def find_old_keys(days=500):
+    # Create an IAM client
+    iam = boto3.client("iam")
+    threshold_date = datetime.now(timezone.utc) - timedelta(days=days)
+
+    print(f"Checking IAM users for keys older than {days} days...")
+    users = iam.list_users()["Users"]
+
+    for user in users:
+        username = user["UserName"]
+        access_keys = iam.list_access_keys(UserName=username)["AccessKeyMetadata"]
+
+        for key in access_keys:
+            create_date = key["CreateDate"]
+            if create_date < threshold_date:
+                print(f"User: {username}, KeyId: {key['AccessKeyId']}, Created: {create_date}")
+
+# Main script execution
+if __name__ == "__main__":
+    account = "example/AWSAdministratorAccess"
+    try:
+        assume_role(account)
+        find_old_keys(days=500)
+    finally:
+        unset_assume_role()
+```
+
+## Multi-account assume 
+
+This is a particularly bespoke yet useful tool wherein you might need to iterate over multiple accounts in your org and perform a query or process.
+
+Before using this script you should review the output of `assumego --generate-bash-completion` because this will display all the accounts in your SSO list, and you might have to restrict the output via `grep -v` before using the output as is.
+
+Heres an example in bash which queries for access logging, but in each account.
+
+```bash
+#!/bin/bash
+
+# Function to check if the user is logged into AWS SSO
+check_aws_login() {
+  echo "Checking AWS SSO session..."
+  if ! aws sts get-caller-identity --query "Arn" --output text >/dev/null 2>&1; then
+    echo "Error: AWS SSO session is not active. Please log in using 'aws sso login'."
+    exit 1
+  fi
+  echo "AWS SSO session is active."
+}
+
+# Function to retrieve and display the account ID
+get_account_id() {
+  account_id=$(aws sts get-caller-identity --query "Account" --output text)
+  if [[ -z "$account_id" ]]; then
+    echo "Error: Unable to retrieve AWS account ID."
+    exit 1
+  fi
+  echo "Current AWS Account ID: $account_id"
+}
+
+echo "Checking access logging for buckets..."
+echo "==================================="
+for account in $(assumego --generate-bash-completion); do
+    check_aws_login()
+
+    current_id=$(get_account_id)
+    buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+
+    if [[ -z "$buckets" ]]; then
+    echo "No buckets found in the account."
+    exit 0
+    fi
+
+    
+
+    # Iterate over the list of buckets and notify only if logging is not enabled
+    for bucket in $buckets; do
+    logging_status=$(aws s3api get-bucket-logging --bucket "$bucket" --query "LoggingEnabled" --output text 2>/dev/null)
+    if [[ "$logging_status" == "None" ]]; then
+        echo "Bucket: $current_id: $bucket - Access logging is NOT enabled."
+    fi
+done
+
+assume --unset
+```

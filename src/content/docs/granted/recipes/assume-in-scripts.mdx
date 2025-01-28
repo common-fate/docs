@@ -2,7 +2,7 @@
 title: "Assume Roles in Commands"
 ---
 
-## overview
+## Overview
 
 Normally we are prompted to choose a role when using assume however there are options available which make it possible to build scripts that assume without prompt (unless your token has expired)
 
@@ -10,10 +10,9 @@ This workflow/recipe is suitable for people who need to perform attended scripts
 
 It can also be adapted to script across multiple accounts in your org which is otherwise relatively tedeous.
 
-This solution builds upon the basic concept of the inline-role-assumption
 
 
-## bash assume single account example
+## Bash assume single account example
 
 In bash you need to ensure the current profile has been correctly exported, more recently some alias bugs have prevented the behavior working reliably so in scripts we can just avoid this issue entirely by being more explicit.
 

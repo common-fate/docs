@@ -73,22 +73,30 @@ in this case we need to use `assume -x` and rely on those exported credentials b
 ```Python
 import subprocess
 import boto3
+import os
 from datetime import datetime, timedelta, timezone
 
 # Function to invoke `assume` command via subprocess
 def assume_role(account):
     print(f"Assuming account: {account}")
     result = subprocess.run(
-        f"assume -x {account}",
+        f". assume -x {account} && env",
         shell=True,
         executable="/bin/bash",
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
+        stderr=subprocess.PIPE,
+        text=True
     )
     if result.returncode != 0:
         print(f"Error assuming account: {result.stderr.decode().strip()}")
         exit(1)
     print("Assumed successfully!")
+
+    for line in result.stdout.splitlines():
+        if line.startswith("AWS_"):  # Capture only AWS-related environment variables
+            key, value = line.split("=", 1)
+            os.environ[key] = value.strip()
+            print(f"✅ Set {key} in Python environment.")  # Log each captured variable
 
 def unset_assume_role():
     print("Unsetting assume role...")
@@ -125,7 +133,7 @@ def find_old_keys(days=500):
 
 # Main script execution
 if __name__ == "__main__":
-    account = "example/AWSAdministratorAccess"
+    account = "example.org/AWSAdministratorAccess"
     try:
         assume_role(account)
         find_old_keys(days=500)

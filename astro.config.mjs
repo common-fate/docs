@@ -182,7 +182,7 @@ export default defineConfig({
                 { slug: "granted/recipes/eks" },
                 { slug: "granted/recipes/inline-role-assumption" },
                 { slug: "granted/recipes/pass" },
-                { slug: "granted/recipes/ubuntu-keyring" },
+                { slug: "granted/recipes/secretservice" },
                 { slug: "granted/recipes/wsl-vscode" },
               ],
             },

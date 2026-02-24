@@ -106,10 +106,19 @@ Examples of Audit Log and Authorization events are shown below.
 {
   "id": "evt_2f0ChzJvrOOqchMhRmJieErz9Bl",
   "targets": [
-    { "type": "AWS::Account", "id": "450666865322" },
     {
-      "type": "AWS::IDC::PermissionSet",
-      "id": "arn:aws:sso:::permissionSet/ssoins-825968feece9a0b6/ps-04543749a2b53328"
+      "eid": {
+        "type": "AWS::Account",
+        "id": "450666865322"
+      },
+      "name": "account1"
+    },
+    {
+      "eid": {
+        "type": "AWS::IDC::PermissionSet",
+        "id": "arn:aws:sso:::permissionSet/ssoins-825968feece9a0b6/ps-04543749a2b53328"
+      },
+      "name": "permissionset1"
     },
     {
       "type": "Access::Grant",
@@ -156,7 +165,23 @@ Examples of Audit Log and Authorization events are shown below.
     "authz": { "eval": "eval_2f0CiEDjaVlVw9BjJP4Wn4dQMDb" }
   },
   "occurred_at": "2024-04-12T14:32:11.981852+01:00",
-  "index": 0
+  "index": 0,
+  "entitlement": {
+    "target": {
+      "eid": {
+        "type": "AWS::Account",
+        "id": "450666865322"
+      },
+      "name": "account1"
+    },
+    "role": {
+      "eid": {
+        "type": "AWS::IDC::PermissionSet",
+        "id": "arn:aws:sso:::permissionSet/ssoins-825968feece9a0b6/ps-04543749a2b53328"
+      },
+      "name": "permissionset1"
+    }
+  }
 }
 ```
 
